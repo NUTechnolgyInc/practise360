@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Practise360 Tracker</title>
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="topbar-title">
+        <h1>Practise360 Tracker</h1>
+        <span id="generated-at" class="subtle"></span>
+      </div>
+      <div class="topbar-controls">
+        <input id="search" type="search" placeholder="Search ID, title, note…" autocomplete="off" />
+        <select id="epic-filter"><option value="">All epics</option></select>
+        <select id="health-filter">
+          <option value="">All health</option>
+          <option value="🟢">🟢 On track</option>
+          <option value="🟡">🟡 Gap / follow-up</option>
+          <option value="🔴">🔴 Broken / blocked</option>
+        </select>
+        <div class="view-toggle">
+          <button id="view-board" class="toggle-btn active" type="button">Board</button>
+          <button id="view-log" class="toggle-btn" type="button">Change Log</button>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <section id="board-view">
+        <div id="summary" class="summary"></div>
+        <div id="board" class="board"></div>
+      </section>
+
+      <section id="log-view" class="hidden">
+        <div id="changelog" class="changelog"></div>
+      </section>
+    </main>
+
+    <div id="ticket-panel" class="panel hidden">
+      <div class="panel-backdrop" id="panel-backdrop"></div>
+      <div class="panel-sheet">
+        <button id="panel-close" class="panel-close" type="button" aria-label="Close">×</button>
+        <div id="panel-content"></div>
+      </div>
+    </div>
+
+    <footer class="statusbar">
+      <span id="status-text">Loading…</span>
+    </footer>
+
+    <script src="/app.js"></script>
+  </body>
+</html>

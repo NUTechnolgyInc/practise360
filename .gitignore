@@ -1,0 +1,14 @@
+node_modules
+.next
+.vercel
+.env*
+!.env.example
+.DS_Store
+*.log
+
+# Claude
+.claude/settings.local.json
+.claude/worktrees/
+
+# Generated from docs/tracker/TRACKER.md
+docs/tracker/tracker.json

@@ -1,0 +1,13 @@
+{
+  "name": "api",
+  "version": "1.0.0",
+  "private": true,
+  "main": "src/app.js",
+  "scripts": {
+    "dev": "node --watch src/local.js",
+    "start": "node src/local.js"
+  },
+  "dependencies": {
+    "express": "^4.21.2"
+  }
+}
