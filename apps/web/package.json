@@ -3,9 +3,12 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
+    "predev": "node scripts/pack-skills.mjs && node scripts/copy-pdfjs-assets.mjs",
     "dev": "next dev -p 3000",
+    "prebuild": "node scripts/pack-skills.mjs && node scripts/copy-pdfjs-assets.mjs",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "prepare-assets": "node scripts/pack-skills.mjs && node scripts/copy-pdfjs-assets.mjs"
   },
   "dependencies": {
     "@tailwindcss/postcss": "^4.3.5",
@@ -13,6 +16,7 @@
     "clsx": "^2.1.1",
     "lucide-react": "^1.72.0",
     "next": "^15.5.0",
+    "pdfjs-dist": "^4.10.38",
     "postcss": "^8.5.32",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",

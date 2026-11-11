@@ -19,19 +19,19 @@ platform                         (global)
 - **App visibility is derived**: a user sees an app if they hold any assignment at that app or below it. No separate "app access" table to keep in sync.
 - Certification Tracker has no sub-scopes of its own. It reuses **practice scope**: a Practice Lead's cert permissions apply to practitioners of *their* practice.
 
-## 2. Data model
+## 2. Data model (MongoDB)
 
-| Table | Key columns | Notes |
+| Collection | Key fields | Notes |
 |---|---|---|
-| `users` | id, username, display_name, is_active | Password not stored for now (hardcoded `password`, dev only) |
-| `apps` | id (`practices`, `cert-tracker`, `ai-tracker`), name | |
-| `practices` | id, app_id, name, slug | DE, Platform, QA, AI |
-| `permissions` | key, app_id, description | Static catalog, seeded from code |
-| `roles` | id, key, name, scope_type, scope_id (nullable), is_system | `scope_id` set ⇒ custom role owned by one practice |
-| `role_permissions` | role_id, permission_key | |
-| `role_assignments` | user_id, role_id, scope_type, scope_id, granted_by, granted_at | One row per (user, role, scope) |
+| `users` | _id (ObjectId), username (unique), displayName, email, isActive | No password stored (dev login uses hardcoded `password`) |
+| `apps` | _id (`practices`, `cert-tracker`, `ai-tracker`), name, permPrefix | |
+| `practices` | _id (slug), appId, name, isArchived | DE, Platform, QA, AI |
+| `permissions` | _id (= key), appId, description | Static catalog, seeded from `apps/api/src/rbac/catalog.js` |
+| `roles` | _id, name, scopeType, scopeId, isSystem, assignableFrom, **permissions[]** | Permissions are embedded (no join collection). `scopeId` set on app roles and on custom roles (owning practice) |
+| `role_assignments` | userId, roleId, scopeType, scopeId, grantedBy, grantedAt | Unique on (userId, roleId, scopeType, scopeId) |
 
-`scope_type` ∈ `platform | app | practice`. A user can hold several assignments (e.g. Lead in DE, Practitioner in AI).
+`scopeType` ∈ `platform | app | practice`. A user can hold several assignments (e.g. Lead in DE, Practitioner in AI).
+Grants are resolved from the DB on every API request (not baked into the JWT), so a revoked role stops working immediately.
 
 ## 3. Permission catalog
 
@@ -40,6 +40,7 @@ Format: `<app>.<resource>.<action>`. `:own` suffix = only on records the user ow
 **Platform**
 - `platform.users.manage` — create/disable users
 - `platform.apps.assign` — grant app-level admin roles
+- `platform.roles.manage` — edit system roles and their permissions (Super Admin only, via `*`)
 
 **Practices app**
 - `practices.practice.create`, `practices.practice.update`, `practices.practice.archive`
@@ -59,23 +60,42 @@ Format: `<app>.<resource>.<action>`. `:own` suffix = only on records the user ow
 - `cert.plan.verify` — mark completion as verified
 - `cert.reports.view`
 
-**AI Tracker** (placeholder until requirements are clear)
-- `ai.admin.manage`, `ai.items.create`, `ai.items.update`, `ai.items.view`, `ai.reports.view`
+**AI Tracker**
+- `ai.usage.manage:own` — submit, replace and delete your own monthly Claude usage report (PDF)
+- `ai.usage.view` — view usage reports of people in scope (see "Claude usage reports" below)
+- `ai.admin.manage`, `ai.items.create`, `ai.items.update`, `ai.items.view`, `ai.reports.view` — placeholders, unused until initiative tracking is specified
 
 ## 4. System roles
 
 | Role | Scope | Permissions |
 |---|---|---|
 | **Super Admin** | platform | everything (`*`) |
-| **Practices Admin** | app: practices | all `practices.*`, `cert.plan.view`, `cert.reports.view` |
-| **Practice Manager** | practice | `practices.practice.view/update`, `practices.members.*`, `practices.roles.*`, `cert.plan.view/suggest/assign/verify`, `cert.reports.view`, `cert.plan.manage:own` |
-| **Practice Lead** | practice | `practices.practice.view`, `practices.members.view`, `practices.roles.view`, `cert.plan.view/suggest/assign`, `cert.plan.manage:own` |
-| **Practitioner** | practice | `practices.practice.view`, `practices.members.view`, `cert.catalog.view`, `cert.plan.manage:own` |
+| **Practices Admin** | app: practices | all `practices.*`, `cert.catalog.view`, all `cert.plan.*`, `cert.reports.view`, `ai.usage.view`, `ai.usage.manage:own` ¹ ² |
+| **Practice Manager** | practice | `practices.practice.view/update`, `practices.members.*`, `practices.roles.*`, `cert.plan.view/suggest/assign/verify`, `cert.reports.view`, `cert.plan.manage:own`, `ai.usage.view`, `ai.usage.manage:own` |
+| **Practice Lead** | practice | `practices.practice.view`, `practices.members.view`, `practices.roles.view`, `cert.plan.view/suggest/assign`, `cert.plan.manage:own`, `ai.usage.manage:own` |
+| **Practitioner** | practice | `practices.practice.view`, `practices.members.view`, `cert.catalog.view`, `cert.plan.manage:own`, `ai.usage.manage:own` |
 | **Cert Admin** | app: cert-tracker | all `cert.*` (across all practices) |
 | **AI Admin** | app: ai-tracker | all `ai.*` |
-| **AI Member** | app: ai-tracker | `ai.items.create/update/view` |
+| **AI Member** | app: ai-tracker | `ai.items.create/update/view`, `ai.usage.manage:own` |
 
-Practice roles also implicitly include `cert.catalog.view`, which makes Cert Tracker visible to every practice member.
+¹ Changed 2026-11-11: the original list (`cert.plan.view`, `cert.reports.view` only) made §5 impossible — the escalation guard needs the actor to hold every Manager permission, including `cert.plan.suggest/assign/verify/manage:own`. Pending owner sign-off.
+
+² Added 2026-11-12 with Claude usage reports: Practices Admin must hold every Manager permission to appoint Managers (§5).
+
+The table above is the **default** set (`apps/api/src/rbac/catalog.js`). Since 2026-11-12 Super Admin can edit system roles at runtime (`platform.roles.manage`):
+- Editable: name, description, permissions. Fixed: id, scope type, `assignableFrom` — so the escalation guard's shape doesn't change.
+- Super Admin itself (`*`) is never editable, so nobody can lock the platform out.
+- `platform.*` permissions only on platform-scope roles.
+- Edits apply on the next request to everyone holding the role. The escalation guard still applies to *granting*: if Practice Manager gains a permission Practices Admin lacks, Practices Admin can't appoint Managers until it gets it too.
+- `npm run sync-roles -w api` no longer overwrites existing system roles; `-- --reset` restores the defaults.
+
+Practice roles also implicitly include `cert.catalog.view` and `ai.usage.manage:own`, which makes Cert Tracker and AI Tracker visible to every practice member.
+
+### Claude usage reports (AI Tracker)
+- Every practice member (and AI Member) uploads **one PDF per month** (`YYYY-MM`, not in the future, ≤ 4 MB); uploading again replaces it. The PDF is produced by the `claude-usage-report` skill users download from the portal.
+- Reports have no scope of their own. Like Cert Tracker they **reuse the owner's practice scope**: a report is visible to anyone with `ai.usage.view` at one of the owner's practices (or a parent), or at `app: ai-tracker`.
+- Result: Practice Manager → their practice; Practices Admin → every practice member; AI Admin / Super Admin → everyone (including people with no practice). Leads and Practitioners see only their own.
+- The team view lists everyone holding `ai.usage.manage:own` in the viewer's scope as Submitted / Pending, so managers can chase missing reports. Super Admin (`*` only) isn't expected to submit.
 
 ### Custom roles
 - Created **inside a practice** by anyone with `practices.roles.manage` there (Practice Manager, Practices Admin).
@@ -94,6 +114,9 @@ Result:
 - Practices Admin → assigns Practice Managers in any practice.
 - Practice Manager → assigns Lead, Practitioner, custom roles in *their* practice. Cannot appoint another Manager: roles carry an `assignable_from` field, and `practice_manager` is `assignable_from: app`, so only Practices Admin can grant it.
 - Practice Lead → cannot assign roles (no `practices.roles.assign`).
+- App roles (Cert Admin, AI Admin, AI Member) use `platform.apps.assign`, which only Super Admin holds — so an AI Admin can't add AI Members yet (see open question 5).
+- **Revoking** is guarded the same way as granting, and the last Super Admin assignment can't be removed.
+- Custom roles: the creator must hold every permission they put in the role at that practice.
 
 ## 6. Authorization check
 
@@ -154,4 +177,5 @@ The hardcoded password must sit behind an `AUTH_MODE=dev` flag so it can't ship 
 2. Should a Practice Manager be able to appoint another Manager, or only Practices Admin?
 3. Custom roles: per practice only, or also global templates a Practices Admin can reuse?
 4. Can a Lead see all practitioners in the practice, or only their direct reportees?
-5. AI Tracker: what entities and roles beyond Admin/Member?
+5. AI Tracker: what entities and roles beyond Admin/Member? (Claude usage reports are built; initiative tracking still open.)
+6. Should Practice Leads see their practice's Claude usage reports? Currently no — only Managers and above.

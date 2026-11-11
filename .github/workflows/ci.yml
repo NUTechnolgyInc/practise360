@@ -28,5 +28,6 @@ jobs:
 
       - run: npm ci
 
-      # Add lint / test steps here once those scripts exist in package.json.
+      - run: npm test
+      # Add a lint step here once that script exists in package.json.
       - run: npm run build

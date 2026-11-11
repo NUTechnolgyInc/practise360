@@ -1,0 +1,70 @@
+{
+  "meta": {
+    "name": "Riley Patel",
+    "practice": "Digital Engineering",
+    "month": "2026-10",
+    "sources": ["Claude Code history", "Claude.ai past chats"],
+    "conversations_analyzed": 84,
+    "coverage_note": "All sessions in the month were analysed."
+  },
+  "executive_summary": {
+    "summary": "Claude was used daily, mostly for hands-on engineering: building features, debugging and writing tests. An estimated 80 hours were saved in October, with the biggest gains on boilerplate-heavy code and documentation. Usage is shifting from ad-hoc questions to multi-step tasks, and four recurring tasks are good candidates for reusable skills.",
+    "highlights": [
+      "84 conversations across 9 categories; coding and debugging make up 55%",
+      "About 80 hours saved — roughly two working weeks",
+      "Test writing and API documentation show the highest ROI",
+      "Weekly status update and PR description should become skills"
+    ]
+  },
+  "use_cases": [
+    { "category": "Coding", "count": 31, "example": "Built REST endpoints with validation and tests" },
+    { "category": "Debugging", "count": 15, "example": "Traced a race condition in a background job" },
+    { "category": "Testing & QA", "count": 9, "example": "Generated integration tests for an auth flow" },
+    { "category": "Documentation", "count": 8, "example": "Drafted API reference and runbook updates" },
+    { "category": "Architecture & design", "count": 6, "example": "Compared queue options for scheduled jobs" },
+    { "category": "Code review", "count": 5, "example": "Reviewed a PR against team conventions" },
+    { "category": "Emails & communication", "count": 5, "example": "Weekly status update to stakeholders" },
+    { "category": "Project management", "count": 3, "example": "Broke an epic into tickets with estimates" },
+    { "category": "Research & learning", "count": 2, "example": "Learned a new ORM's migration model" }
+  ],
+  "productivity": {
+    "assumptions": "Manual estimates assume a mid-level engineer working without AI assistance; Claude time includes reviewing and correcting output.",
+    "by_category": [
+      { "category": "Coding", "manual_minutes": 120, "claude_minutes": 50 },
+      { "category": "Debugging", "manual_minutes": 90, "claude_minutes": 40 },
+      { "category": "Testing & QA", "manual_minutes": 90, "claude_minutes": 25 },
+      { "category": "Documentation", "manual_minutes": 75, "claude_minutes": 20 },
+      { "category": "Architecture & design", "manual_minutes": 120, "claude_minutes": 60 },
+      { "category": "Code review", "manual_minutes": 45, "claude_minutes": 20 },
+      { "category": "Emails & communication", "manual_minutes": 25, "claude_minutes": 8 },
+      { "category": "Project management", "manual_minutes": 60, "claude_minutes": 20 },
+      { "category": "Research & learning", "manual_minutes": 90, "claude_minutes": 45 }
+    ]
+  },
+  "top_roi": [
+    { "task": "Writing integration tests", "why": "Boilerplate-heavy; first drafts are ~80% right and cover edge cases that are easy to forget" },
+    { "task": "API documentation", "why": "Generated straight from the code, so it stays accurate and takes minutes instead of an afternoon" },
+    { "task": "Feature scaffolding", "why": "Routes, models and validation produced in one pass following existing patterns" }
+  ],
+  "recurring_work": [
+    { "task": "Weekly status update email", "frequency_per_month": 4, "make_skill": true, "benefit": "Same structure every week, ~15 min saved each time" },
+    { "task": "PR descriptions", "frequency_per_month": 12, "make_skill": true, "benefit": "Consistent summary, testing notes and risk section" },
+    { "task": "Ticket breakdown from a requirement", "frequency_per_month": 3, "make_skill": true, "benefit": "Uniform acceptance criteria and estimates" },
+    { "task": "Explaining an unfamiliar error", "frequency_per_month": 6, "make_skill": false, "benefit": "Too varied to template; a good prompt is enough" }
+  ],
+  "insights": {
+    "patterns": [
+      "Most sessions are long, multi-step build tasks rather than one-off questions",
+      "Peak usage mid-sprint; documentation work clusters before releases"
+    ],
+    "strengths": [
+      "Gives Claude concrete acceptance criteria up front",
+      "Asks for tests alongside code, which cuts rework"
+    ],
+    "improvements": [
+      "Paste the relevant file or error first — sessions that start with context finish 30–40% faster",
+      "Turn the weekly status update and PR description into skills",
+      "Ask for a short plan before large changes to catch misunderstandings early"
+    ]
+  }
+}

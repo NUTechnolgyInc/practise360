@@ -17,7 +17,10 @@ Two Vercel projects from the same repo:
 | Var | Project | Purpose |
 |---|---|---|
 | `NEXT_PUBLIC_API_URL` | web | Base URL of the API |
-| `AUTH_MODE` | api | `dev` enables the hardcoded-password login. **Must not be `dev` in production.** |
+| `AUTH_MODE` | api | `dev` enables the hardcoded-password login. **Must not be `dev` in production** — the API refuses to start if it is on a Vercel production deploy. |
+| `MONGODB_URI` | api | MongoDB connection string (e.g. Atlas) |
+| `JWT_SECRET` | api | Signs session tokens. Long random value, different per environment |
+| `WEB_ORIGIN` | api | Web URL(s) allowed by CORS, comma-separated |
 
 Values live in Vercel project settings and local `.env` files (gitignored). Never commit them.
 

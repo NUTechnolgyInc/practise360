@@ -1,5 +1,6 @@
 import { Montserrat, Open_Sans } from "next/font/google";
 import { ToastProvider } from "@/components/ui/toast";
+import { SessionProvider } from "@/components/auth/session-provider";
 import "./globals.css";
 
 const montserrat = Montserrat({
@@ -23,7 +24,9 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en" className={`${montserrat.variable} ${openSans.variable}`}>
       <body>
-        <ToastProvider>{children}</ToastProvider>
+        <ToastProvider>
+          <SessionProvider>{children}</SessionProvider>
+        </ToastProvider>
       </body>
     </html>
   );

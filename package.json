@@ -10,7 +10,8 @@
     "dev:api": "npm run dev -w api",
     "build": "npm run build --workspaces --if-present",
     "tracker": "node scripts/tracker/serve.mjs",
-    "tracker:build": "node scripts/tracker/parse-tracker.mjs"
+    "tracker:build": "node scripts/tracker/parse-tracker.mjs",
+    "test": "npm test --workspaces --if-present"
   },
   "engines": {
     "node": ">=20"

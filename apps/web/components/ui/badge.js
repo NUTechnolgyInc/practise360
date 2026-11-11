@@ -34,6 +34,9 @@ const STATUS_VARIANT = {
   PoC: "purple",
   Pilot: "primary",
   Production: "success",
+  // Claude usage report submission
+  Submitted: "success",
+  Pending: "warning",
 };
 
 export function StatusBadge({ status, className }) {

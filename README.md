@@ -10,10 +10,15 @@ apps/
 
 ## Local dev
 
+Needs Node 20 and a local MongoDB (`mongodb://localhost:27017`).
+
 ```bash
 npm install
-npm run dev:web   # http://localhost:3000
-npm run dev:api   # http://localhost:4000
+cp apps/api/.env.example apps/api/.env   # set JWT_SECRET to any long random string
+npm run seed -w api                      # wipes + seeds RBAC data (AUTH_MODE=dev only)
+npm run dev:api   # http://localhost:4000  (API docs: http://localhost:4000/docs)
+npm run dev:web   # http://localhost:3000 — sign in as any seeded user, password "password"
+npm test -w api   # RBAC engine tests
 ```
 
 ## Deploy (Vercel)

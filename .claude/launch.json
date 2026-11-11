@@ -4,20 +4,93 @@
     {
       "name": "web",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev:web"],
+      "runtimeArgs": [
+        "run",
+        "dev:web"
+      ],
       "port": 3000
     },
     {
       "name": "api",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev:api"],
+      "runtimeArgs": [
+        "run",
+        "dev:api"
+      ],
       "port": 4000
     },
     {
       "name": "tracker",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "tracker"],
+      "runtimeArgs": [
+        "run",
+        "tracker"
+      ],
       "port": 4777
+    },
+    {
+      "name": "api-alt",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev:api"
+      ],
+      "port": 4001,
+      "env": {
+        "PORT": "4001",
+        "WEB_ORIGIN": "http://localhost:3100"
+      }
+    },
+    {
+      "name": "web-alt",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev",
+        "-w",
+        "web",
+        "--",
+        "-p",
+        "3100"
+      ],
+      "port": 3100,
+      "env": {
+        "NEXT_DIST_DIR": ".next-alt",
+        "NEXT_PUBLIC_API_URL": "http://localhost:4001"
+      }
+    },
+    {
+      "name": "api-3",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev:api"
+      ],
+      "port": 4002,
+      "autoPort": false,
+      "env": {
+        "PORT": "4002",
+        "WEB_ORIGIN": "http://localhost:3102"
+      }
+    },
+    {
+      "name": "web-3",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev",
+        "-w",
+        "web",
+        "--",
+        "-p",
+        "3102"
+      ],
+      "port": 3102,
+      "autoPort": false,
+      "env": {
+        "NEXT_DIST_DIR": ".next-3",
+        "NEXT_PUBLIC_API_URL": "http://localhost:4002"
+      }
     }
   ]
 }
