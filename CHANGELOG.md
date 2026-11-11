@@ -9,5 +9,7 @@ Add entries under **Unreleased** in the same PR as the change, grouped as Added 
 
 ### Added
 - Hello-world monorepo: Next.js web (`apps/web`) and Express API (`apps/api`), deployable to Vercel.
+- NULogic-branded UI kit in `apps/web` (Tailwind v4 tokens; Button, Badge/StatusBadge, Card, form fields, Modal, Tabs, Table, StatTile, Progress, Avatar, EmptyState/NoAccess, Toast; AppShell with sidebar, top bar and user menu) with a live gallery at `/ui-kit`.
+- UI guidelines (`docs/ui-guidelines.md`) and `ui-builder` project skill.
 - Initial RBAC design (`docs/rbac.md`) and mockup generation prompt (`docs/gemini-mockup-prompt.md`).
 - Project workflow: `CLAUDE.md`, delivery tracker with Kanban board (`npm run tracker`), QA plan/report folders, review guide and CI.

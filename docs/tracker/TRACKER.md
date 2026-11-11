@@ -29,5 +29,8 @@ Compress when the Change Log passes ~150–200 lines, or when a milestone closes
 
 ## Change Log
 
+### 2026-11-11 — UI kit, guidelines and ui-builder skill
+Added the NULogic-branded component kit to `apps/web` (Tailwind v4 tokens, `components/ui`, `components/layout`, `components/brand`, `/ui-kit` gallery), `docs/ui-guidelines.md`, and the `ui-builder` skill, so screens built from the mockup share one look and one set of RBAC-in-UI rules. Foundation only — no ticket; real screens (launcher, practices, certs, AI tracker, admin) are still to be built. Logo uses the official SVGs because the bundled PNGs have an opaque white background that breaks on the navy sidebar.
+
 ### 2026-11-11 — Tracker created
 Project Claude setup: tracker, changelog, skills and memory added, mirroring the quizzy workflow. No tickets yet — the owner will add tasks later.

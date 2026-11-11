@@ -34,6 +34,7 @@ apps/
   api/   Express 4 backend, Vercel serverless fn (localhost:4000)
 docs/
   rbac.md                  RBAC design (source of truth)
+  ui-guidelines.md         UI rules: tokens, component kit, RBAC-in-UI, a11y
   gemini-mockup-prompt.md  Prompt used to generate the clickable mockup
   tracker/                 Delivery tracker + archive
   qa/                      Test plans and QA reports
@@ -70,6 +71,7 @@ Username + password, password hardcoded to `password` for every seeded user. Thi
 3. Check memory (see below) for decisions already made.
 
 ### During Development
+- **UI**: follow `docs/ui-guidelines.md` — compose from `apps/web/components/ui` + `components/layout`, `nu-*` tokens only (no hex), one primary button per view, hide what `can()` denies. Live kit at http://localhost:3000/ui-kit.
 - **One authorization helper**: every permission check goes through a single `can(user, permission, scope, resource?)` — no ad-hoc `if (user.role === 'manager')` checks anywhere.
 - **Server-side enforcement**: every API route that reads or mutates practice/cert/AI data declares its required permission and scope via middleware.
 - **No secrets in the repo**: env values live in Vercel / local `.env` (gitignored). Use `[REDACTED]` placeholders in docs.
@@ -95,6 +97,7 @@ View it as a Kanban board: `npm run tracker` → http://localhost:4777.
 **`CHANGELOG.md`** (repo root) records user-visible changes per release in Keep a Changelog format. Add an entry under `## [Unreleased]` in the same PR as any user-facing change (new screen, new permission, changed behavior). Tracker Change Log = delivery history; `CHANGELOG.md` = what changed for users.
 
 ### Skills & Agents (`.claude/`)
+- `ui-builder` — build/change a screen or component with the NULogic kit, verify in the browser, or audit a screen against `docs/ui-guidelines.md`.
 - `pr-reviewer` — review a PR/diff against RBAC rules and project conventions.
 - `qa-test-plan` — draft test scenarios for a feature, stop for approval.
 - `qa-test-run` — execute an approved plan (or a smoke pass) and write a report to `docs/qa/reports/`.

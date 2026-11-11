@@ -1,0 +1,61 @@
+@import "tailwindcss";
+
+/*
+ * NULogic design tokens. Every colour, font and gradient used in the UI comes from here —
+ * components reference `nu-*` utilities, never raw hex values. See docs/ui-guidelines.md.
+ */
+@theme {
+  /* Primary (60%) */
+  --color-nu-lapis: #050766;
+  --color-nu-navy: #25255c;
+
+  /* Secondary (30%) */
+  --color-nu-red-orange: #e62a32;
+  --color-nu-purple: #8939a1;
+  --color-nu-dark-teal: #133e49;
+  --color-nu-near-white: #f4f5f6;
+
+  /* Tertiary (10%) */
+  --color-nu-muted-teal: #3e616a;
+  --color-nu-soft-coral: #ee777c;
+  --color-nu-light-purple: #b17dc1;
+  --color-nu-dusty-indigo: #61629d;
+
+  --font-sans: var(--font-open-sans), "Open Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-heading: var(--font-montserrat), "Montserrat", ui-sans-serif, system-ui, sans-serif;
+
+  --animate-fade-in: fade-in 160ms ease-out;
+  @keyframes fade-in {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: none; }
+  }
+}
+
+/* Brand gradients as utilities so they compose with Tailwind modifiers (hover:, md:, ...). */
+@utility bg-nu-primary {
+  background-image: linear-gradient(135deg, #d42f7b, #e8623a);
+}
+@utility bg-nu-brand-bar {
+  background-image: linear-gradient(to right, #ed3027, #7b469b);
+}
+@utility bg-nu-dark {
+  background-image: linear-gradient(135deg, #1b1f4e, #7b2d8e);
+}
+
+@layer base {
+  body {
+    @apply bg-nu-near-white font-sans text-nu-dark-teal antialiased;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-heading text-nu-lapis;
+  }
+}
+
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: #f1f1f1; }
+::-webkit-scrollbar-thumb { background: #c5c7d0; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--color-nu-purple); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
