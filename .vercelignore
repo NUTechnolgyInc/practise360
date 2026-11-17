@@ -1,0 +1,11 @@
+# Keep local secrets and generated output out of CLI uploads (Vercel doesn't read .gitignore).
+**/.env
+**/.env.*
+!**/.env.example
+**/node_modules
+**/.next*
+.claude
+e2e/report
+e2e/.results
+apps/web/public/skills
+apps/web/public/pdfjs

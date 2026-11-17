@@ -12,6 +12,30 @@ Two Vercel projects from the same repo:
 - Production deploys from `main` via the Vercel GitHub integration. PRs run CI only (`.github/workflows/ci.yml`).
 - Production URLs: _not recorded yet — add them here once the projects are live._
 
+## Demo deployment (rlal-nu1)
+
+Live since 2026-11-17 on Vercel team **rlal-nu1's projects**, with seeded demo data and demo passwords on (`AUTH_MODE=dev` + `ALLOW_DEMO_LOGIN_IN_PRODUCTION=true`). Anyone with the URL can sign in as any seeded user.
+
+| Project | Root | URL |
+|---|---|---|
+| `practise360-web` | `apps/web` | https://practise360-web.vercel.app |
+| `practise360-api` | `apps/api` | https://practise360-api.vercel.app (Swagger at `/docs`) |
+
+- **Database:** MongoDB Atlas, database `practise360` (seeded with `npm run seed -w api`).
+- **Node:** 24.x on Vercel (Vercel has retired 20.x).
+- **Not linked to GitHub:** the rlal-nu1 account has no access to `NUTechnolgyInc/practise360`, so pushes don't redeploy. Deploy from the repo root with the CLI signed in to rlal-nu1 (`.vercelignore` keeps local `.env` files out of the upload):
+
+```bash
+VERCEL_ORG_ID=team_UfgeFSA47qY2QQNgCJY5wEiy VERCEL_PROJECT_ID=prj_KBfOtIedJFbMZ2TVaXMI0eAOkaB3 vercel deploy --prod --yes
+```
+
+```bash
+VERCEL_ORG_ID=team_UfgeFSA47qY2QQNgCJY5wEiy VERCEL_PROJECT_ID=prj_Vl1r8Y4JNHhkkVSp6Azx8I8BHlix vercel deploy --prod --yes
+```
+
+  The first deploys the API, the second the web app. To get auto-deploys instead, install the Vercel GitHub app for the `NUTechnolgyInc` org and connect both projects to the repo.
+- Re-seeding wipes every Practise360 collection in that database: `MONGODB_URI=[REDACTED] AUTH_MODE=dev npm run seed -w api`.
+
 ## Environment variables
 
 | Var | Project | Purpose |

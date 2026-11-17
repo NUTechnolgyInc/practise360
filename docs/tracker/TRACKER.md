@@ -65,6 +65,9 @@ Compress when the Change Log passes ~150–200 lines, or when a milestone closes
 
 ## Change Log
 
+### 2026-11-17 — Demo deployment on Vercel
+Deployed `practise360-web` (https://practise360-web.vercel.app) and `practise360-api` (https://practise360-api.vercel.app) to Vercel team rlal-nu1, on MongoDB Atlas seeded with the demo data, so the app can be shown without a local setup. Demo passwords stay on through the new `ALLOW_DEMO_LOGIN_IN_PRODUCTION` opt-in (owner decision) — the production guard still blocks `AUTH_MODE=dev` without it. Projects deploy from the CLI because rlal-nu1 can't reach the GitHub repo; Node 24 because Vercel retired 20. Steps in `docs/runbooks/deployment.md`.
+
 ### 2026-11-17 — P360-2: Google sign-in
 Replaced the 501 stub. The login page renders Google's own button (Google Identity Services, popup); the API verifies the ID token against `GOOGLE_CLIENT_ID` (signature, audience, expiry, verified email, optional `GOOGLE_ALLOWED_DOMAINS` via the Workspace `hd` claim) and signs in only emails that already have an active account — no self-sign-up, because accounts come from invitations. The Client ID is served by `/auth/config` so it lives in one env var. The password form now only shows when `AUTH_MODE=dev`. Added `npm run set-email -w api` (dev only) to point a seeded user at a real Google address for testing. Stays 🟡 until a real Google sign-in has been tested locally; the current Client ID comes from a personal Google Cloud project and must move to a nulogic.io project before production.
 
