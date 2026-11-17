@@ -9,7 +9,7 @@ const access = require("../rbac/contribution-access");
 const { bad, wrap, rawBody, str, parseDate, usersById, person, practiceMembers: membersWhere, sendStoredFile, safeFileName } = require("../lib/http");
 const { contributionSummary: summary } = require("../lib/summaries");
 
-const { PERM, actionsFor, viewablePractices, creatablePractices, submissionProblems, nextStatus, sameId } = access;
+const { PERM, actionsFor, viewablePractices, creatablePractices, addForPractices, canAddFor, submissionProblems, nextStatus, sameId } = access;
 const router = express.Router();
 
 // ---------- presentation ----------
@@ -19,6 +19,7 @@ const presentFile = (f) => ({ id: String(f._id), fileName: f.fileName, contentTy
 async function detail(c, tree, user) {
   const ids = [
     c.ownerId,
+    c.createdBy,
     ...(c.contributorIds || []),
     ...(c.invites || []).flatMap((i) => [i.userId, i.by]),
     ...(c.joinRequests || []).map((r) => r.userId),
@@ -114,7 +115,7 @@ router.get(
     if (query.q) filter.title = { $regex: String(query.q).replace(/[.*+?^${}()|[\]\\]/g, "\\$&").slice(0, 80), $options: "i" };
 
     const docs = await Contribution.find(filter, "-events -description").sort({ updatedAt: -1 }).limit(500).lean();
-    const people = await usersById(docs.map((c) => c.ownerId));
+    const people = await usersById(docs.flatMap((c) => [c.ownerId, c.createdBy]));
     let rows = docs.map((c) => summary(c, people, tree, user));
     if (query.mine === "true") rows = rows.filter((r) => r.mine);
     if (query.awaitingMe === "true") rows = rows.filter((r) => r.awaitingMe);
@@ -124,6 +125,7 @@ router.get(
       contributions: rows,
       practices: tree.practices.filter((p) => visible.includes(p._id)).map((p) => ({ id: p._id, name: p.name })),
       canCreateIn: creatablePractices(user, tree),
+      canAddForIn: addForPractices(user, tree),
     });
   }),
 );
@@ -131,9 +133,20 @@ router.get(
 router.post(
   "/",
   wrap(async (req, res) => {
+    const { user, tree } = req;
     const { practiceId, type } = req.body || {};
     const title = str(req.body?.title, 120, "Title");
-    if (!creatablePractices(req.user, req.tree).includes(practiceId)) return bad(res, `Missing permission ${PERM.CREATE} in that practice`, 403);
+    // ownerId = adding it on a member's behalf (rbac.md §4 "Contributions"); otherwise the caller owns it.
+    const forId = req.body?.ownerId && !sameId(req.body.ownerId, user.id) ? String(req.body.ownerId) : null;
+    if (forId) {
+      if (!mongoose.isValidObjectId(forId)) return bad(res, "Pick a practice member");
+      const members = await practiceMembers(practiceId, tree.practices);
+      const member = members.find((m) => m.id === forId);
+      if (!member) return bad(res, "You can only add a contribution for a member of this practice");
+      if (!canAddFor(user, practiceId, forId, tree)) return bad(res, `Needs ${PERM.MANAGE} for ${member.displayName} — a Lead can only add contributions for their own group`, 403);
+    } else if (!creatablePractices(user, tree).includes(practiceId)) {
+      return bad(res, `Missing permission ${PERM.CREATE} in that practice`, 403);
+    }
     if (!title) return bad(res, "Title is required");
     if (!CONTRIBUTION_TYPES.includes(type)) return bad(res, "Pick a contribution type");
     const customType = type === "other" ? str(req.body.customType, 60, "Custom type") : undefined;
@@ -149,10 +162,11 @@ router.post(
       type,
       customType,
       description: str(req.body.description, 200000, "Description"),
-      ownerId: req.user.id,
+      ownerId: forId ?? user.id,
+      createdBy: user.id,
       startDate,
       dueDate,
-      events: [{ kind: "created", authorId: req.user.id, body: `Started **${title}**` }],
+      events: [forId ? { kind: "created", authorId: user.id, subjectId: forId, body: `Added **${title}** on their behalf` } : { kind: "created", authorId: user.id, body: `Started **${title}**` }],
     });
     req.contribution = c;
     await respond(req, res, 201);
@@ -166,6 +180,18 @@ router.get(
     const { practiceId } = req.params;
     if (!can(req.user, PERM.VIEW, { type: "practice", id: practiceId }, undefined, req.tree.practices)) return bad(res, `Missing permission ${PERM.VIEW}`, 403);
     res.json(await practiceMembers(practiceId, req.tree.practices));
+  }),
+);
+
+/** Members the caller can add a contribution for — a Lead gets their group, a Manager the whole practice. */
+router.get(
+  "/practices/:practiceId/owners",
+  wrap(async (req, res) => {
+    const { practiceId } = req.params;
+    const { user, tree } = req;
+    if (!addForPractices(user, tree).includes(practiceId)) return bad(res, `Missing permission ${PERM.MANAGE} in that practice`, 403);
+    const members = await practiceMembers(practiceId, tree.practices);
+    res.json(members.filter((m) => !sameId(m.id, user.id) && canAddFor(user, practiceId, m.id, tree)));
   }),
 );
 

@@ -223,6 +223,9 @@ const contributionSchema = new Schema(
     customType: { type: String, trim: true, maxlength: 60 }, // only for type "other"
     description: { type: String, default: "", maxlength: 200000 }, // Markdown
     ownerId: { type: ObjectId, ref: "User", required: true },
+    // Who created it. Differs from ownerId when a Lead/Manager/Practices Admin added it on a member's behalf;
+    // missing on older records, which were always created by their owner.
+    createdBy: { type: ObjectId, ref: "User" },
     contributorIds: [{ type: ObjectId, ref: "User" }],
     invites: [{ userId: { type: ObjectId, ref: "User" }, by: { type: ObjectId, ref: "User" }, at: { type: Date, default: Date.now }, _id: false }],
     joinRequests: [{ userId: { type: ObjectId, ref: "User" }, message: String, at: { type: Date, default: Date.now }, _id: false }],

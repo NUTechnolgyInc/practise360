@@ -4,6 +4,7 @@ import { Badge, StatusBadge, Table, TBody, TD, TH, THead, TR } from "@/component
 import { PersonChip } from "@/components/people/person-link";
 import { statusLabel, typeLabel } from "@/lib/contributions";
 import { formatDate } from "@/lib/format";
+import { AddedByBadge } from "./added-by";
 
 /** Contributions list. `showPractice` adds the practice column for people who see several practices. */
 export function ContributionTable({ rows, showPractice }) {
@@ -28,6 +29,7 @@ export function ContributionTable({ rows, showPractice }) {
               </Link>
               <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px] text-nu-muted-teal">
                 {typeLabel(c)}
+                <AddedByBadge contribution={c} />
                 {c.awaitingMe && <Badge variant="purple">Awaiting your review</Badge>}
                 {c.pendingJoinRequests > 0 && c.mine && <Badge variant="teal">{c.pendingJoinRequests} join request{c.pendingJoinRequests > 1 ? "s" : ""}</Badge>}
               </div>

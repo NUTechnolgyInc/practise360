@@ -46,7 +46,7 @@ Compress when the Change Log passes ~150–200 lines, or when a milestone closes
 
 | ID | Title | Status | Health | Last Updated | Note |
 |---|---|---|---|---|---|
-| P360-11 | Practice contributions: start, contributors, progress log, submit, Lead → Manager review, publish | In Progress | 🟡 | 2026-11-12 | Built + verified locally end to end; needs owner sign-off on the new `practices.contribution.*` RBAC and `sync-roles` on the deployed DB. No notifications yet |
+| P360-11 | Practice contributions: start, contributors, progress log, submit, Lead → Manager review, publish | In Progress | 🟡 | 2026-11-17 | Built + verified locally end to end; needs owner sign-off on the new `practices.contribution.*` RBAC and `sync-roles` on the deployed DB. No notifications yet |
 | P360-13 | Practices and groups: create practices + choose Manager, groups with their own Lead, membership, Lead reach limited to their group | In Progress | 🟡 | 2026-11-13 | Built + verified locally; 2026-11-13 adds the practice Overview and Contributions tabs and group pages run by their Lead (`practices.group.update`). Needs `sync-roles` on the deployed DB — it converts practice-wide Leads to Practitioner (re-appoint them per group) and adds `practices.group.update`. No archive/delete for practices yet |
 
 ## P360-E4 — Certification Tracker
@@ -64,6 +64,9 @@ Compress when the Change Log passes ~150–200 lines, or when a milestone closes
 ---
 
 ## Change Log
+
+### 2026-11-17 — P360-11: Add a contribution on a member's behalf
+Owner asked that Practices Admin, Practice Manager and Practice Lead can add a contribution for a practitioner, with the "added by someone else" clearly visible. Owner chose: reuse `practices.contribution.manage` at the member's scope (Lead → own group only, no new permission); the adder can't review or approve it; the practitioner owns and submits it. API: optional `ownerId` on `POST /contributions`, new `GET /contributions/practices/:id/owners`, `createdBy` on the model, `addedBy` + `canAddForIn` in responses; `actionsFor()` blocks the adder from both review steps. UI: Owner picker on Start a contribution, "Added by" badge on list rows and the detail header, plus Details, People card and timeline text. Two unit tests added (77/77 API tests pass); verified in the browser as `de.lead` (picker lists only their group; API 403s an out-of-group add). Not run: Playwright e2e. No status change — P360-11 stays 🟡 for RBAC sign-off and notifications.
 
 ### 2026-11-17 — P360-2: Google sign-in creates the account
 Owner decision: turning away Google users without an account blocked people who just hadn't been invited yet. The first Google sign-in now creates the account with no roles — it opens no app, and the home page says to ask the Practice Manager to be added. Invitations and Google share one find-or-create-by-email helper, so a later invitation to that email reuses the account. With `GOOGLE_ALLOWED_DOMAINS` unset (the demo), any verified Google account can create one; set it to `nulogic.io` for real use.

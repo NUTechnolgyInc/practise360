@@ -36,7 +36,7 @@ router.get(
     // Each record keeps its own rule, so a co-contributor from the practice still sees the shared contribution.
     const contributions = contributionDocs.filter((c) => actionsFor(viewer, c, tree).view);
     const plans = planDocs.filter((p) => certActionsFor(viewer, p, tree).view);
-    const people = await usersById([...contributions.map((c) => c.ownerId), ...plans.flatMap((p) => [p.ownerId, p.createdBy])]);
+    const people = await usersById([...contributions.flatMap((c) => [c.ownerId, c.createdBy]), ...plans.flatMap((p) => [p.ownerId, p.createdBy])]);
     const sections = {
       // null = this part of the profile is hidden from the viewer; [] = shown, but empty.
       contributions: view.contributions || contributions.length ? contributions.map((c) => contributionSummary(c, people, tree, viewer)) : null,

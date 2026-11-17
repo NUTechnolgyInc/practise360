@@ -45,7 +45,7 @@ export function PeopleCard({ contribution, meId, run }) {
     <Card>
       <CardHeader title="People" description={`${c.contributors.length + 1} working on this`} />
       <ul className="divide-y divide-gray-100">
-        <Row person={c.owner} subtitle="Owner · started it" />
+        <Row person={c.owner} subtitle={c.addedBy ? `Owner · added by ${c.addedBy.displayName}` : "Owner · started it"} />
         {c.contributors.map((p) => (
           <Row key={p.id} person={p} subtitle="Contributor">
             {actions.manageMembers && (

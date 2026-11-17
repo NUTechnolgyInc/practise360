@@ -8,6 +8,7 @@ import { PageHeader } from "@/components/layout";
 import { Button, Card, CardHeader, EmptyState, useToast } from "@/components/ui";
 import { DetailsFields, validateDetails } from "@/components/contributions/details-fields";
 import { MarkdownEditor } from "@/components/contributions/markdown-editor";
+import { OwnerField } from "@/components/contributions/owner-field";
 import { useResource } from "@/hooks/use-resource";
 import { api } from "@/lib/api";
 
@@ -28,10 +29,15 @@ function NewContribution() {
   const router = useRouter();
   const toast = useToast();
   const back = returnTo(useSearchParams());
-  // The list endpoint tells us where the caller may start one (practices.contribution.create).
+  // The list endpoint tells us where the caller may start one (practices.contribution.create) and where they may add
+  // one for a member (practices.contribution.manage — Lead, Manager, Practices Admin).
   const { data, loading } = useResource("/contributions");
-  const practices = (data?.practices ?? []).filter((p) => data.canCreateIn.includes(p.id));
-  const [form, setForm] = useState({ title: "", practiceId: "", type: "", customType: "", startDate: today(), dueDate: "", description: TEMPLATE });
+  const ownIn = data?.canCreateIn ?? [];
+  const forIn = data?.canAddForIn ?? [];
+  const practices = (data?.practices ?? []).filter((p) => ownIn.includes(p.id) || forIn.includes(p.id));
+  const [form, setForm] = useState({ title: "", practiceId: "", ownerId: "", type: "", customType: "", startDate: today(), dueDate: "", description: TEMPLATE });
+  const canAddFor = !!form.practiceId && forIn.includes(form.practiceId);
+  const forSomeone = canAddFor && !!form.ownerId;
   const [errors, setErrors] = useState({});
   const [busy, setBusy] = useState(false);
 
@@ -44,13 +50,14 @@ function NewContribution() {
   const submit = async (e) => {
     e.preventDefault();
     const found = validateDetails(form, { needPractice: true });
+    if (form.practiceId && !forSomeone && !ownIn.includes(form.practiceId)) found.ownerId = "Choose who it's for";
     setErrors(found);
     if (Object.keys(found).length) return;
     setBusy(true);
     try {
       const description = form.description.trim() === TEMPLATE.trim() ? "" : form.description;
-      const created = await api("/contributions", { method: "POST", body: { ...form, description } });
-      toast(`Started ${created.title}`);
+      const created = await api("/contributions", { method: "POST", body: { ...form, ownerId: forSomeone ? form.ownerId : undefined, description } });
+      toast(forSomeone ? `Added ${created.title} for ${created.owner.displayName}` : `Started ${created.title}`);
       router.push(`/practices/contributions/${created.id}`);
     } catch (err) {
       toast(err.message, "error");
@@ -63,11 +70,20 @@ function NewContribution() {
 
   return (
     <>
-      <PageHeader back={{ href: back.href, label: "Contributions" }} title="Start a contribution" description="You'll be the owner. Invite contributors and log progress once it's created." />
+      <PageHeader
+        back={{ href: back.href, label: "Contributions" }}
+        title="Start a contribution"
+        description={forSomeone ? "The member you pick owns it and submits it; it shows as added by you." : "You'll be the owner. Invite contributors and log progress once it's created."}
+      />
       <form onSubmit={submit} className="space-y-6" noValidate>
         <Card>
           <CardHeader title="Details" />
-          <DetailsFields value={form} onChange={setForm} errors={errors} practices={practices} />
+          <DetailsFields value={form} onChange={(v) => setForm(v.practiceId === form.practiceId ? v : { ...v, ownerId: "" })} errors={errors} practices={practices} />
+          {canAddFor && (
+            <div className="mt-4 sm:w-1/2 sm:pr-2">
+              <OwnerField key={form.practiceId} practiceId={form.practiceId} canOwn={ownIn.includes(form.practiceId)} value={form.ownerId} onChange={(ownerId) => setForm((f) => ({ ...f, ownerId }))} error={errors.ownerId} />
+            </div>
+          )}
         </Card>
         <Card>
           <CardHeader title="Description" description="What it is and why it matters. Write Markdown, or import a Word (.docx) or Markdown document — formatting is kept." />
@@ -76,7 +92,7 @@ function NewContribution() {
         <div className="flex justify-end gap-2">
           <Button variant="ghost" onClick={() => router.push(back.href)}>Cancel</Button>
           <Button type="submit" disabled={busy}>
-            {busy && <Loader2 className="animate-spin" />} Start contribution
+            {busy && <Loader2 className="animate-spin" />} {forSomeone ? "Add contribution" : "Start contribution"}
           </Button>
         </div>
       </form>

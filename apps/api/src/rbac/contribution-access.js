@@ -1,7 +1,7 @@
 // Who may do what on a contribution (docs/rbac.md §4 "Contributions"). Pure — no DB, unit-tested.
 // Contributions live in a practice and are checked at the owner's group when they're in one (so only that group's
 // Lead reviews them), else at the practice. "Own" means owner or contributor, so `update:own` covers both.
-const { can, memberScope, treeOf } = require("./engine");
+const { can, canWithin, memberScope, treeOf } = require("./engine");
 
 const PERM = {
   VIEW: "practices.contribution.view",
@@ -19,6 +19,8 @@ const sameId = (a, b) => a != null && b != null && String(a) === String(b);
 const scopeOf = (c, tree) => memberScope(tree, c.practiceId, c.ownerId);
 const participantIds = (c) => [c.ownerId, ...(c.contributorIds || [])];
 const isParticipant = (c, userId) => participantIds(c).some((id) => sameId(id, userId));
+/** Who added it on the owner's behalf, or null when the owner started it themselves. */
+const addedByOf = (c) => (c.createdBy && !sameId(c.createdBy, c.ownerId) ? c.createdBy : null);
 
 /** Everything the UI may offer `user` on `c`. The routes call the same function, so UI and API can't drift. */
 function actionsFor(user, c, tree) {
@@ -27,6 +29,7 @@ function actionsFor(user, c, tree) {
   const uid = user.id;
   const owner = sameId(c.ownerId, uid);
   const participant = isParticipant(c, uid);
+  const adder = sameId(addedByOf(c), uid);
   const manage = has(PERM.MANAGE);
   const work = manage || has(PERM.UPDATE, { ownerIds: participantIds(c) });
   const open = !CLOSED.includes(c.status);
@@ -47,10 +50,20 @@ function actionsFor(user, c, tree) {
     // Only the owner hands the work in; it can be (re)submitted while in progress or after a clarification request.
     submit: owner && work && EDITABLE.includes(c.status),
     // Nobody reviews their own work. A Manager can take the Lead step but can't then also give final approval.
-    review: c.status === "lead_review" && !participant && has(PERM.REVIEW),
-    approve: c.status === "manager_review" && !participant && !sameId(c.leadReview?.by, uid) && has(PERM.APPROVE),
+    // Whoever added it on the owner's behalf can't review it either — they'd be approving an entry they made.
+    review: c.status === "lead_review" && !participant && !adder && has(PERM.REVIEW),
+    approve: c.status === "manager_review" && !participant && !adder && !sameId(c.leadReview?.by, uid) && has(PERM.APPROVE),
   };
 }
+
+/**
+ * May `user` add a contribution owned by `memberId`? Same reach as managing one: `manage` at the member's scope, so a
+ * Lead only adds for their own group's members, the Manager for anyone in the practice, Practices Admin everywhere.
+ */
+const canAddFor = (user, practiceId, memberId, tree) => can(user, PERM.MANAGE, memberScope(tree, practiceId, memberId), undefined, tree);
+
+/** Practice ids where the user may add a contribution for someone else (manage at the practice or one of its groups). */
+const addForPractices = (user, tree) => treeOf(tree).practices.filter((p) => canWithin(user, PERM.MANAGE, p._id, tree)).map((p) => p._id);
 
 /** Practice ids where the user may see contributions. */
 const viewablePractices = (user, tree) => treeOf(tree).practices.filter((p) => can(user, PERM.VIEW, { type: "practice", id: p._id }, undefined, tree)).map((p) => p._id);
@@ -82,4 +95,4 @@ function nextStatus(stage, decision) {
 
 const isOverdue = (c, now = new Date()) => !CLOSED.includes(c.status) && c.status !== "lead_review" && c.status !== "manager_review" && new Date(c.dueDate) < now;
 
-module.exports = { PERM, EDITABLE, CLOSED, actionsFor, viewablePractices, creatablePractices, submissionProblems, nextStatus, isParticipant, isOverdue, sameId };
+module.exports = { PERM, EDITABLE, CLOSED, actionsFor, viewablePractices, creatablePractices, addForPractices, canAddFor, addedByOf, submissionProblems, nextStatus, isParticipant, isOverdue, sameId };

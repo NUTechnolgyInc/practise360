@@ -11,6 +11,7 @@ import { PersonLink } from "@/components/people/person-link";
 import { AttachButton, FileChips } from "@/components/contributions/attachments";
 import { ContributionActions } from "@/components/contributions/contribution-actions";
 import { EditModal } from "@/components/contributions/edit-modals";
+import { AddedByBadge } from "@/components/contributions/added-by";
 import { PeopleCard } from "@/components/contributions/people-card";
 import { Timeline } from "@/components/contributions/timeline";
 import { SubmissionCard, WorkflowStepper } from "@/components/contributions/workflow-panel";
@@ -94,12 +95,14 @@ function ContributionDetail() {
           <>
             <StatusBadge status={statusLabel(c.status)} />
             {c.overdue && <Badge variant="danger"><AlertTriangle className="size-3" aria-hidden="true" /> Overdue</Badge>}
+            <AddedByBadge contribution={c} />
           </>
         }
         title={c.title}
         description={
           <>
-            {typeLabel(c)} · {c.practice.name} · started by <PersonLink person={c.owner} className="font-semibold" /> on {formatDate(c.startDate)}
+            {typeLabel(c)} · {c.practice.name} · {c.addedBy ? "owned" : "started"} by <PersonLink person={c.owner} className="font-semibold" />
+            {c.addedBy && <> · added by <PersonLink person={c.addedBy} className="font-semibold" /></>} on {formatDate(c.startDate)}
           </>
         }
         actions={<ContributionActions contribution={c} run={run} onFilesAdded={addFiles} />}
@@ -126,7 +129,8 @@ function ContributionDetail() {
             <dl className="divide-y divide-gray-100">
               <Fact label="Type">{typeLabel(c)}</Fact>
               <Fact label="Practice">{c.practice.name}</Fact>
-              <Fact label="Started by"><PersonLink person={c.owner} /></Fact>
+              <Fact label={c.addedBy ? "Owner" : "Started by"}><PersonLink person={c.owner} /></Fact>
+              {c.addedBy && <Fact label="Added by"><PersonLink person={c.addedBy} /></Fact>}
               <Fact label="Start date">{formatDate(c.startDate)}</Fact>
               <Fact label="Due date"><span className={c.overdue ? "text-rose-600" : undefined}>{formatDate(c.dueDate)}</span></Fact>
             </dl>

@@ -2,7 +2,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const { PRACTICES, SYSTEM_ROLES } = require("../src/rbac/catalog");
-const { actionsFor, submissionProblems, nextStatus, viewablePractices, isOverdue } = require("../src/rbac/contribution-access");
+const { actionsFor, submissionProblems, nextStatus, viewablePractices, isOverdue, canAddFor, addForPractices, addedByOf } = require("../src/rbac/contribution-access");
 const { FULLSTACK, DEVOPS, treeWith } = require("./fixtures");
 
 const roles = Object.fromEntries(SYSTEM_ROLES.map((r) => [r._id, r]));
@@ -74,6 +74,33 @@ test("Manager step: Manager or Practices Admin, not the person who did the Lead 
   assert.ok(acts(manager, s).approve && acts(admin, s).approve);
   assert.ok(!acts(lead, s).approve, "Leads can't give final approval");
   assert.ok(!acts(manager, { ...s, leadReview: { by: "manager" } }).approve, "one person can't do both steps");
+});
+
+test("adding for someone else: Lead for their group only, Manager for the practice, Practices Admin anywhere", () => {
+  assert.ok(canAddFor(lead, DE, "owner", TREE), "Lead → own group's member");
+  assert.ok(!canAddFor(lead, DE, "devopsLead", TREE), "Lead → not another group's member");
+  assert.ok(!canAddFor(lead, DE, "loner", TREE), "Lead → not a member outside any group");
+  assert.ok(canAddFor(manager, DE, "loner", TREE) && canAddFor(manager, DE, "owner", TREE));
+  assert.ok(!canAddFor(manager, "qa", "qa", TREE), "Manager → not another practice");
+  assert.ok(canAddFor(admin, "qa", "qa", TREE));
+  for (const u of [owner, bystander]) assert.ok(!canAddFor(u, DE, "helper", TREE), `${u.id} can't add for others`);
+  assert.deepEqual(addForPractices(lead, TREE), [DE]);
+  assert.deepEqual(addForPractices(owner, TREE), []);
+  assert.equal(addForPractices(admin, TREE).length, PRACTICES.length);
+});
+
+test("added on someone's behalf: the owner runs it, the adder can't review it", () => {
+  const added = { createdBy: "lead", contributorIds: [] };
+  assert.equal(addedByOf(contribution(added)), "lead");
+  assert.equal(addedByOf(contribution({ createdBy: "owner" })), null, "started by the owner themselves");
+  assert.equal(addedByOf(contribution()), null, "older records have no createdBy");
+  assert.ok(acts(owner, added).submit && acts(owner, added).edit, "the member owns it");
+  assert.ok(!acts(lead, added).submit, "only the owner submits");
+  assert.ok(acts(lead, added).logProgress, "the adder keeps their manage rights");
+  assert.ok(!acts(lead, { ...added, status: "lead_review" }).review, "the adder can't take the Lead step");
+  assert.ok(acts(manager, { ...added, status: "lead_review" }).review, "the Manager can instead");
+  const byManager = { createdBy: "manager", status: "manager_review", leadReview: { by: "lead" } };
+  assert.ok(!acts(manager, byManager).approve && acts(admin, byManager).approve, "Practices Admin approves what the Manager added");
 });
 
 test("published and declined contributions are read-only", () => {

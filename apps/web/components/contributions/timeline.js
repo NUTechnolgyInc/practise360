@@ -25,7 +25,8 @@ const DECISION = { approve: "approved", decline: "declined", clarify: "asked for
 function describe(e) {
   switch (e.kind) {
     case "created":
-      return { icon: Flag, tone: "bg-nu-lapis text-white", text: "started this contribution" };
+      // A subject means it was added on that member's behalf.
+      return { icon: Flag, tone: "bg-nu-lapis text-white", text: e.subject ? <>added this contribution for <Subject e={e} /></> : "started this contribution" };
     case "progress":
       return { icon: PenLine, tone: "bg-purple-100 text-nu-purple", text: "posted an update" };
     case "member":

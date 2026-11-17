@@ -6,7 +6,7 @@ const { person } = require("./http");
 
 const practiceRef = (tree, id) => ({ id, name: tree.practices.find((p) => p._id === id)?.name ?? id });
 
-/** One contribution as a list row. `people` = usersById() of at least the owner. */
+/** One contribution as a list row. `people` = usersById() of at least the owner and creator. */
 function contributionSummary(c, people, tree, user) {
   const actions = contributionAccess.actionsFor(user, c, tree);
   return {
@@ -17,6 +17,7 @@ function contributionSummary(c, people, tree, user) {
     practice: practiceRef(tree, c.practiceId),
     status: c.status,
     owner: person(people, c.ownerId),
+    addedBy: person(people, contributionAccess.addedByOf(c)),
     contributorCount: (c.contributorIds || []).length,
     startDate: c.startDate,
     dueDate: c.dueDate,

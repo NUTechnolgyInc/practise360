@@ -29,6 +29,7 @@ const schemas = {
       practice: { type: "object", properties: { id: { type: "string" }, name: { type: "string" } } },
       status: { type: "string", enum: STATUSES },
       owner: Person,
+      addedBy: { ...Person, nullable: true, description: "Who added it on the owner's behalf; null when the owner started it" },
       contributorCount: { type: "integer" },
       startDate: { type: "string", format: "date-time" },
       dueDate: { type: "string", format: "date-time" },
@@ -92,17 +93,26 @@ const paths = {
       responses: {
         200: json("Contributions, the practices the caller can see, and where they can start one", {
           type: "object",
-          properties: { contributions: { type: "array", items: ref("ContributionSummary") }, practices: { type: "array", items: { type: "object" } }, canCreateIn: { type: "array", items: { type: "string" } } },
+          properties: {
+            contributions: { type: "array", items: ref("ContributionSummary") },
+            practices: { type: "array", items: { type: "object" } },
+            canCreateIn: { type: "array", items: { type: "string" } },
+            canAddForIn: { type: "array", items: { type: "string" }, description: "Practices where the caller may add a contribution for a member" },
+          },
         }),
         ...COMMON,
       },
     },
-    post: op("Start a contribution", "Requires `practices.contribution.create` in `practiceId`. The caller becomes the owner.", {
+    post: op(
+      "Start a contribution",
+      "Requires `practices.contribution.create` in `practiceId`; the caller becomes the owner. With `ownerId`, adds it on that member's behalf instead: needs `practices.contribution.manage` at the member's group (else practice), so a Lead only adds for their own group. The member owns it; the caller is recorded as `addedBy` and can't review it.",
+      {
       requestBody: body({
         type: "object",
         required: ["practiceId", "title", "type", "startDate", "dueDate"],
         properties: {
           practiceId: { type: "string", example: "digital-engineering" },
+          ownerId: { type: "string", description: "Add it on behalf of this practice member (omit to own it yourself)" },
           title: { type: "string", example: "nu-auth-shared" },
           type: { type: "string", enum: TYPES },
           customType: { type: "string", description: "Required when type is `other`" },
@@ -111,8 +121,9 @@ const paths = {
           dueDate: { type: "string", format: "date" },
         },
       }),
-      responses: { 201: json("Created", ref("Contribution")), 400: err("Validation failed"), ...COMMON },
-    }),
+        responses: { 201: json("Created", ref("Contribution")), 400: err("Validation failed"), ...COMMON },
+      },
+    ),
   },
   "/contributions/practices/{practiceId}/people": {
     get: {
@@ -121,6 +132,16 @@ const paths = {
       security,
       parameters: [path("practiceId", "Practice id")],
       responses: { 200: json("Members holding practices.contribution.create there", { type: "array", items: Person }), ...COMMON },
+    },
+  },
+  "/contributions/practices/{practiceId}/owners": {
+    get: {
+      tags: [TAG],
+      summary: "Members the caller can add a contribution for",
+      description: "Practice members within the caller's `practices.contribution.manage` reach: a Lead gets their group's members, a Manager the whole practice.",
+      security,
+      parameters: [path("practiceId", "Practice id")],
+      responses: { 200: json("Members", { type: "array", items: Person }), ...COMMON },
     },
   },
   "/contributions/{id}": {
