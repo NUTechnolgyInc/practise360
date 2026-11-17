@@ -4,6 +4,7 @@ const assert = require("node:assert/strict");
 const { checkGrant } = require("../src/rbac/engine");
 const { PRACTICES, SYSTEM_ROLES } = require("../src/rbac/catalog");
 const { canViewReportsOf, canSubmit, isSubmitter, isValidPeriod } = require("../src/rbac/usage-access");
+const { QA_AUTO, treeWith } = require("./fixtures");
 
 const roles = Object.fromEntries(SYSTEM_ROLES.map((r) => [r._id, r]));
 const userWith = (...assignments) => ({
@@ -13,7 +14,8 @@ const userWith = (...assignments) => ({
 const sees = (viewer, ownerPractices) => canViewReportsOf(viewer, ownerPractices, PRACTICES);
 
 test("every practice role and AI Member can submit their own report", () => {
-  for (const r of ["practitioner", "practice_lead", "practice_manager"]) assert.ok(canSubmit(userWith([r, "practice", "qa"])), r);
+  for (const r of ["practitioner", "practice_manager"]) assert.ok(canSubmit(userWith([r, "practice", "qa"])), r);
+  assert.ok(canSubmit(userWith(["practitioner", "practice", "qa"], ["practice_lead", "group", QA_AUTO])), "a Lead submits as a practice member");
   assert.ok(canSubmit(userWith(["ai_member", "app", "ai-tracker"])));
   assert.ok(isSubmitter(userWith(["practitioner", "practice", "qa"]).grants));
   assert.ok(!isSubmitter(userWith(["super_admin", "platform"]).grants), "Super Admin isn't chased for a report");
@@ -28,7 +30,7 @@ test("Practice Manager sees only their practice's reports", () => {
 });
 
 test("Leads and Practitioners can't see other people's reports", () => {
-  assert.ok(!sees(userWith(["practice_lead", "practice", "qa"]), ["qa"]));
+  assert.ok(!sees(userWith(["practitioner", "practice", "qa"], ["practice_lead", "group", QA_AUTO]), ["qa"]));
   assert.ok(!sees(userWith(["practitioner", "practice", "qa"]), ["qa"]));
   assert.ok(!sees(userWith(["ai_member", "app", "ai-tracker"]), ["qa"]));
 });
@@ -43,7 +45,7 @@ test("Practices Admin sees all practices; AI Admin and Super Admin see everyone"
 
 test("escalation guard still lets Practices Admin appoint Managers and Managers appoint Leads", () => {
   assert.ok(checkGrant(userWith(["practices_admin", "app", "practices"]), roles.practice_manager, { type: "practice", id: "qa" }, PRACTICES).ok);
-  assert.ok(checkGrant(userWith(["practice_manager", "practice", "qa"]), roles.practice_lead, { type: "practice", id: "qa" }, PRACTICES).ok);
+  assert.ok(checkGrant(userWith(["practice_manager", "practice", "qa"]), roles.practice_lead, { type: "group", id: QA_AUTO }, treeWith()).ok);
 });
 
 test("period must be YYYY-MM and not in the future", () => {

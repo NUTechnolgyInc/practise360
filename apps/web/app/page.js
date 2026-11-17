@@ -6,12 +6,13 @@ import { PortalShell } from "@/components/auth/portal-shell";
 import { useSession } from "@/components/auth/session-provider";
 import { HeroBanner } from "@/components/layout";
 import { Badge, Card, CardHeader, EmptyState } from "@/components/ui";
+import { practicesHome } from "@/components/practices/practices-nav";
 import { canAnywhere, RBAC_PORTAL_PERMS } from "@/lib/can";
 import { cn } from "@/lib/cn";
 
 const APP_INFO = {
-  practices: { icon: Users, description: "Practices, their members and roles" },
-  "cert-tracker": { icon: Award, description: "Plan and track certifications and courses" },
+  practices: { icon: Users, description: "Practices, their groups and Leads, and practice contributions", href: "/practices" },
+  "cert-tracker": { icon: Award, description: "Plan certifications and courses, get completions approved", href: "/certifications" },
   "ai-tracker": { icon: Bot, description: "Monthly Claude usage reports", href: "/ai-tracker" },
 };
 
@@ -32,7 +33,11 @@ function Home() {
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {me.apps.map((app) => {
-              const { icon: Icon, description, href } = APP_INFO[app.id] ?? { icon: Users, description: "" };
+              const info = APP_INFO[app.id] ?? { icon: Users, description: "" };
+              const { icon: Icon, description } = info;
+              // A custom role can open the Practices app without any screen in it — don't link to a dead end.
+              const practicesScreen = canAnywhere(me, "practices.practice.view", "practices.contribution.view");
+              const href = app.id === "practices" ? (practicesScreen ? practicesHome(me) : undefined) : info.href;
               const tile = (
                 <div className={cn("h-full rounded-2xl border border-gray-200 p-5", href && "transition-all hover:-translate-y-0.5 hover:border-nu-purple hover:shadow-md")}>
                   <div className="mb-3 flex items-center justify-between">

@@ -21,6 +21,15 @@ npm run dev:web   # http://localhost:3000 — sign in as any seeded user, passwo
 npm test -w api   # RBAC engine tests
 ```
 
+## End-to-end tests (Playwright)
+
+```bash
+npm run test:e2e          # API + browser suite against an isolated stack
+npm run test:e2e:report   # open the HTML report
+```
+
+The suite starts its own API (:4100) and production web build (:3200) on a separate `practise360_e2e` database that is dropped and re-seeded each run, so it never touches your dev data. Needs the local MongoDB. Specs live in `e2e/tests/{api,ui}`; the test-case catalogue is in `docs/qa/plans/`.
+
 ## Deploy (Vercel)
 
 Create two Vercel projects from the same repo:

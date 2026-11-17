@@ -4,6 +4,8 @@ const { Role, RoleAssignment, User } = require("../models");
 const { can, checkGrant, allScopes } = require("../rbac/engine");
 const { describeScope } = require("../rbac/present");
 const { requireAnyScope } = require("../middleware/auth");
+const structure = require("../lib/practice-structure");
+const { cancelPending } = require("../lib/invites");
 
 const router = express.Router();
 const wrap = (fn) => (req, res, next) => fn(req, res).catch(next);
@@ -11,7 +13,7 @@ const scopeOf = (a) => ({ type: a.scopeType, id: a.scopeId ?? null });
 
 /** Which of another user's assignments the viewer may see: members of scopes they can view, or everything for user admins. */
 const VIEW_PERMS = ["practices.members.view", "platform.users.manage", "platform.apps.assign"];
-const canSeeAssignment = (req, a) => VIEW_PERMS.some((p) => can(req.user, p, scopeOf(a), undefined, req.tree.practices));
+const canSeeAssignment = (req, a) => VIEW_PERMS.some((p) => can(req.user, p, scopeOf(a), undefined, req.tree));
 
 router.use(requireAnyScope("practices.members.view", "practices.roles.assign", "platform.users.manage", "platform.apps.assign"));
 
@@ -32,6 +34,7 @@ router.get(
         id: String(u._id),
         username: u.username,
         displayName: u.displayName,
+        email: u.email ?? "",
         assignments: assignments
           .filter((a) => String(a.userId) === String(u._id) && roleById.has(a.roleId) && canSeeAssignment(req, a))
           .map((a) => {
@@ -43,7 +46,7 @@ router.get(
               scopeType: a.scopeType,
               scopeId: a.scopeId,
               scopeLabel: describeScope(a, req.tree),
-              canRevoke: checkGrant(req.user, role, scopeOf(a), req.tree.practices).ok,
+              canRevoke: checkGrant(req.user, role, scopeOf(a), req.tree).ok,
             };
           }),
       })),
@@ -56,12 +59,12 @@ router.get(
   "/assignable",
   wrap(async (req, res) => {
     const roles = await Role.find().sort({ isSystem: -1, name: 1 }).lean();
-    const scopes = allScopes(req.tree.apps, req.tree.practices);
+    const scopes = allScopes(req.tree.apps, req.tree.practices, req.tree.groups);
     const options = roles
       .map((role) => ({
         roleId: role._id,
         roleName: role.name,
-        scopes: scopes.filter((s) => checkGrant(req.user, role, s, req.tree.practices).ok),
+        scopes: scopes.filter((s) => checkGrant(req.user, role, s, req.tree).ok),
       }))
       .filter((o) => o.scopes.length);
     res.json(options);
@@ -78,11 +81,18 @@ router.post(
     if (!role) return res.status(404).json({ error: "Role not found" });
 
     const scope = { type: scopeType, id: scopeType === "platform" ? null : scopeId };
-    const verdict = checkGrant(req.user, role, scope, req.tree.practices);
+    const verdict = checkGrant(req.user, role, scope, req.tree);
     if (!verdict.ok) return res.status(403).json({ error: verdict.reason });
+    // One Manager per practice, one Lead per group, Leads come from the practice (rbac.md §5).
+    const clash = await structure.grantConflict(role, scope, userId, req.tree);
+    if (clash) return res.status(clash.status).json({ error: clash.error });
 
     try {
       const a = await RoleAssignment.create({ userId, roleId, scopeType, scopeId: scope.id, grantedBy: req.user.id });
+      await structure.afterGrant(role, scope, userId, req.user.id, req.tree);
+      // Filling a Manager or Lead slot here voids an open invitation for it, which would otherwise replace them on accept.
+      if (role._id === "practice_manager") await cancelPending({ practiceId: scope.id, kind: "manager" }, req.user.id, "Another Manager was chosen");
+      if (role._id === "practice_lead") await cancelPending({ kind: "lead", groupId: scope.id }, req.user.id, "Another Lead was chosen");
       res.status(201).json({ id: String(a._id) });
     } catch (err) {
       if (err.code === 11000) return res.status(409).json({ error: `${target.displayName} already has ${role.name} there` });
@@ -100,12 +110,15 @@ router.delete(
     const role = await Role.findById(a.roleId).lean();
 
     // Revoking is guarded like granting: a Manager can't remove another Manager.
-    const verdict = role ? checkGrant(req.user, role, scopeOf(a), req.tree.practices) : { ok: false, reason: "Unknown role" };
+    const verdict = role ? checkGrant(req.user, role, scopeOf(a), req.tree) : { ok: false, reason: "Unknown role" };
     if (!verdict.ok) return res.status(403).json({ error: verdict.reason });
     if (role.permissions.includes("*") && (await RoleAssignment.countDocuments({ roleId: role._id })) <= 1) {
       return res.status(409).json({ error: "Can't remove the last Super Admin" });
     }
+    const clash = await structure.revokeConflict(a, req.tree);
+    if (clash) return res.status(clash.status).json({ error: clash.error });
     await RoleAssignment.deleteOne({ _id: a._id });
+    await structure.afterRevoke(a);
     res.status(204).end();
   }),
 );

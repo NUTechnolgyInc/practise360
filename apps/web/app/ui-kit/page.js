@@ -4,8 +4,8 @@ import { useState } from "react";
 import { Award, Cpu, LayoutGrid, Plus, Send, Users } from "lucide-react";
 import { AppShell, HeroBanner, PageHeader } from "@/components/layout";
 import {
-  Badge, Button, Card, CardFooter, CardHeader, EmptyState, Field, Input, Modal, NoAccess, Progress,
-  Select, StatTile, StatusBadge, Table, TBody, TD, TH, THead, TR, Tabs, Textarea, UserChip, useToast,
+  Avatar, Badge, Button, Card, CardFooter, CardHeader, EmptyState, Field, Input, Markdown, Modal, NoAccess, Progress,
+  Select, StatsToggle, StatTile, StatusBadge, Table, TBody, TD, TH, THead, TR, Tabs, Textarea, UserChip, useToast,
 } from "@/components/ui";
 
 // Living reference for docs/ui-guidelines.md. Synthetic data only.
@@ -25,11 +25,13 @@ const USER = {
   ],
 };
 
+const MARKDOWN_SAMPLE = "## sample-shared-lib\nA **reusable** library with `one` entry point.\n\n- Works across projects\n- [Docs](https://example.com)\n\n| Option | Default |\n|---|---|\n| retries | 3 |";
+
 const PLANS = [
   { id: 1, who: "Sam Sample", cert: "Cloud Architect Associate", status: "In Progress", progress: 65 },
   { id: 2, who: "Riley Test", cert: "Kubernetes Administrator", status: "Completed", progress: 100 },
   { id: 3, who: "Jordan Fake", cert: "Terraform Associate", status: "Overdue", progress: 40 },
-  { id: 4, who: "Casey Mock", cert: "Test Automation Foundation", status: "Verified", progress: 100 },
+  { id: 4, who: "Casey Mock", cert: "Test Automation Foundation", status: "Lead review", progress: 100 },
 ];
 
 function Section({ title, children }) {
@@ -44,6 +46,7 @@ function Section({ title, children }) {
 export default function UiKitPage() {
   const [tab, setTab] = useState("buttons");
   const [modalOpen, setModalOpen] = useState(false);
+  const [statsShown, setStatsShown] = useState(true);
   const toast = useToast();
 
   return (
@@ -101,7 +104,7 @@ export default function UiKitPage() {
               ))}
             </div>
             <div className="mt-3 flex flex-wrap gap-2">
-              {["Suggested", "Planned", "In Progress", "Completed", "Verified", "Overdue", "PoC", "Production"].map((s) => (
+              {["Recommended", "Planned", "Lead review", "Clarification needed", "Completed", "Dropped", "Overdue", "Expired", "PoC", "Production"].map((s) => (
                 <StatusBadge key={s} status={s} />
               ))}
             </div>
@@ -125,9 +128,11 @@ export default function UiKitPage() {
 
       {tab === "data" && (
         <>
-          <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+          {/* Pages pair StatsToggle with useShowStats(): tiles start hidden and the choice applies on every page. */}
+          <StatsToggle shown={statsShown} onToggle={() => setStatsShown((v) => !v)} controls="kit-stats" />
+          <div id="kit-stats" hidden={!statsShown} className="grid grid-cols-2 gap-4 md:grid-cols-4">
             <StatTile label="Members" value={12} />
-            <StatTile label="Verified" value={8} tone="success" />
+            <StatTile label="Completed" value={8} tone="success" />
             <StatTile label="Custom roles" value={1} tone="info" />
             <StatTile label="Overdue" value={2} tone="danger" hint="Past target date" />
           </div>
@@ -147,6 +152,17 @@ export default function UiKitPage() {
                 ))}
               </TBody>
             </Table>
+          </Section>
+          {/* App screens use PersonChip / PersonLink (components/people), which fill `href` with the person's profile. */}
+          <Section title="People">
+            <div className="flex flex-wrap items-center gap-6">
+              <Avatar name="Dana Demo" size="xl" />
+              <UserChip name="Dana Demo" subtitle="dana.demo" size="lg" />
+              <UserChip name="Sam Sample" subtitle="Links to a profile" href="/ui-kit" />
+            </div>
+          </Section>
+          <Section title="Markdown">
+            <Markdown>{MARKDOWN_SAMPLE}</Markdown>
           </Section>
         </>
       )}

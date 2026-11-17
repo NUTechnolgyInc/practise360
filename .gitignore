@@ -17,3 +17,7 @@ docs/tracker/tracker.json
 apps/web/public/skills/
 __pycache__/
 apps/web/public/pdfjs/
+
+# Playwright e2e output
+e2e/report/
+e2e/.results/

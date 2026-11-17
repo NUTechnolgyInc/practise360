@@ -6,11 +6,12 @@ import { Loader2 } from "lucide-react";
 import { PortalShell } from "@/components/auth/portal-shell";
 import { useSession } from "@/components/auth/session-provider";
 import { PageHeader } from "@/components/layout";
-import { EmptyState, StatTile, Tabs } from "@/components/ui";
+import { EmptyState, StatsToggle, StatTile, Tabs } from "@/components/ui";
 import { UsersTab } from "@/components/admin/users-tab";
 import { RolesTab } from "@/components/admin/roles-tab";
 import { PermissionMatrix } from "@/components/admin/permission-matrix";
 import { useRbacData } from "@/hooks/use-rbac-data";
+import { useShowStats } from "@/hooks/use-show-stats";
 import { RBAC_PORTAL_PERMS } from "@/lib/can";
 
 const TABS = [
@@ -25,6 +26,7 @@ function AccessControl() {
   const params = useSearchParams();
   const { can } = useSession();
   const { users, roles, catalog, assignable, loading, error, reload } = useRbacData();
+  const [showStats, toggleStats] = useShowStats();
   const tab = TABS.some((t) => t.value === params.get("tab")) ? params.get("tab") : "users";
 
   if (loading) {
@@ -44,9 +46,14 @@ function AccessControl() {
       <PageHeader
         title="Access control"
         description="Assign roles to people and manage custom roles. You only see and grant what your own roles allow."
-        actions={<Tabs aria-label="Access control sections" tabs={TABS} value={tab} onChange={(v) => router.replace(`${pathname}?tab=${v}`)} />}
+        actions={
+          <>
+            <StatsToggle shown={showStats} onToggle={toggleStats} controls="access-stats" />
+            <Tabs aria-label="Access control sections" tabs={TABS} value={tab} onChange={(v) => router.replace(`${pathname}?tab=${v}`)} />
+          </>
+        }
       />
-      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+      <div id="access-stats" hidden={!showStats} className="grid grid-cols-2 gap-4 md:grid-cols-4">
         <StatTile label="Users" value={users.length} tone="purple" />
         <StatTile label="Assignments you can see" value={assignedCount} tone="info" />
         <StatTile label="Roles" value={roles.length} hint={`${roles.filter((r) => !r.isSystem).length} custom`} tone="neutral" />

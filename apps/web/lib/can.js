@@ -1,20 +1,28 @@
 // Client mirror of the API's can() (docs/rbac.md §6). Used ONLY to hide/show UI — the API is the security boundary.
 
-function scopeChain(scope, practices) {
+/** group → practice → app → platform. An unknown group only chains to platform (fails closed, like the API). */
+function scopeChain(scope, me) {
   if (scope.type === "platform") return [{ type: "platform", id: null }];
   if (scope.type === "app") return [{ type: "app", id: scope.id }, { type: "platform", id: null }];
-  const appId = practices.find((p) => p.id === scope.id)?.appId ?? "practices";
+  if (scope.type === "group") {
+    const group = (me.groups ?? []).find((g) => g.id === scope.id);
+    if (!group) return [{ type: "group", id: scope.id }, { type: "platform", id: null }];
+    return [{ type: "group", id: scope.id }, ...scopeChain({ type: "practice", id: group.practiceId }, me)];
+  }
+  const appId = me.practices.find((p) => p.id === scope.id)?.appId ?? "practices";
   return [{ type: "practice", id: scope.id }, { type: "app", id: appId }, { type: "platform", id: null }];
 }
 
 export function can(me, permission, scope, resource) {
   if (!me) return false;
-  const chain = scopeChain(scope, me.practices);
+  const chain = scopeChain(scope, me);
   return me.grants.some((g) => {
     if (!chain.some((s) => s.type === g.scopeType && (s.id ?? null) === (g.scopeId ?? null))) return false;
     const perms = g.permissions;
     if (perms.includes("*") || perms.includes(permission)) return true;
-    return perms.includes(`${permission}:own`) && !!resource && String(resource.ownerId) === String(me.id);
+    if (!perms.includes(`${permission}:own`) || !resource) return false;
+    const owners = resource.ownerIds ?? [resource.ownerId];
+    return owners.some((id) => String(id) === String(me.id));
   });
 }
 

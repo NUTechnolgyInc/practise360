@@ -2,7 +2,8 @@
 
 import { useMemo, useState } from "react";
 import { Search } from "lucide-react";
-import { Badge, Button, Card, CardHeader, EmptyState, Input, Table, TBody, TD, TH, THead, TR, UserChip } from "@/components/ui";
+import { Badge, Button, Card, CardHeader, EmptyState, Input, Table, TBody, TD, TH, THead, TR } from "@/components/ui";
+import { PersonChip } from "@/components/people/person-link";
 import { UserAccessModal } from "./user-access-modal";
 
 export function UsersTab({ users, assignable, onChanged }) {
@@ -12,7 +13,7 @@ export function UsersTab({ users, assignable, onChanged }) {
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return q ? users.filter((u) => `${u.displayName} ${u.username}`.toLowerCase().includes(q)) : users;
+    return q ? users.filter((u) => `${u.displayName} ${u.username} ${u.email ?? ""}`.toLowerCase().includes(q)) : users;
   }, [users, query]);
   const selected = users.find((u) => u.id === selectedId);
 
@@ -24,12 +25,12 @@ export function UsersTab({ users, assignable, onChanged }) {
         actions={
           <div className="relative w-full sm:w-64">
             <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-gray-400" aria-hidden="true" />
-            <Input aria-label="Search users" placeholder="Search users" value={query} onChange={(e) => setQuery(e.target.value)} className="pl-9" />
+            <Input aria-label="Search users" placeholder="Search by name or email" value={query} onChange={(e) => setQuery(e.target.value)} className="pl-9" />
           </div>
         }
       />
       {filtered.length === 0 ? (
-        <EmptyState title="No users match" description="Try a different name or username." />
+        <EmptyState title="No users match" description="Try a different name, username or email." />
       ) : (
         <Table>
           <THead>
@@ -45,7 +46,7 @@ export function UsersTab({ users, assignable, onChanged }) {
             {filtered.map((u) => (
               <TR key={u.id}>
                 <TD>
-                  <UserChip name={u.displayName} subtitle={u.username} />
+                  <PersonChip person={u} subtitle={u.username} />
                 </TD>
                 <TD>
                   <div className="flex flex-wrap gap-1">

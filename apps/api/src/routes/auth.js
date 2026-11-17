@@ -32,12 +32,14 @@ router.post("/login", async (req, res, next) => {
   try {
     if (!isDevAuth()) return res.status(404).json({ error: "Password login is disabled" });
     const { username, password } = req.body || {};
-    if (!username || !password) return res.status(400).json({ error: "Username and password are required" });
+    if (!username || !password) return res.status(400).json({ error: "Username or email and password are required" });
 
     await connectDb();
-    const user = await User.findOne({ username: String(username).toLowerCase().trim() }).lean();
+    // People who joined from an invitation sign in with their email; seeded users with their username.
+    const login = String(username).toLowerCase().trim();
+    const user = await User.findOne(login.includes("@") ? { email: login } : { username: login }).lean();
     // Same message for unknown user and wrong password — don't reveal which usernames exist.
-    if (!user || !user.isActive || password !== DEV_PASSWORD) return res.status(401).json({ error: "Invalid username or password" });
+    if (!user || !user.isActive || password !== DEV_PASSWORD) return res.status(401).json({ error: "Invalid username, email or password" });
 
     res.json({ token: signToken(user._id) });
   } catch (err) {

@@ -21,8 +21,24 @@ Two Vercel projects from the same repo:
 | `MONGODB_URI` | api | MongoDB connection string (e.g. Atlas) |
 | `JWT_SECRET` | api | Signs session tokens. Long random value, different per environment |
 | `WEB_ORIGIN` | api | Web URL(s) allowed by CORS, comma-separated |
+| `WEB_URL` | api | Web app URL used in invitation links (e.g. `https://practise360.example.com`). Optional — defaults to the first `WEB_ORIGIN` |
+| `SMTP_URL` | api | SMTP server for invitation emails, e.g. `smtps://[REDACTED]:[REDACTED]@smtp.example.com:465` (Google Workspace relay, SES, Resend… all work). Unset = emails are only printed to the API log |
+| `MAIL_FROM` | api | Sender, e.g. `Practise360 <no-reply@example.com>`. Must be an address the SMTP provider allows |
+| `INVITE_EMAIL_DOMAINS` | api | Optional comma-separated allow-list of email domains that can be invited (e.g. `nulogic.io`). Unset = any domain |
 
 Values live in Vercel project settings and local `.env` files (gitignored). Never commit them.
+
+## After a release that adds permissions
+
+When `apps/api/src/rbac/catalog.js` gains permissions (e.g. `practices.contribution.*`), run against the target database:
+
+```bash
+MONGODB_URI=[REDACTED] npm run sync-roles -w api
+```
+
+It adds the new permission keys, inserts missing system roles, and adds brand-new permissions to the system roles whose defaults include them. Super Admin's edits to existing permissions are kept. Until it runs, users won't see the new feature.
+
+It also keeps each system role's scope level, `scopeId` and `assignableFrom` in step with the catalog. When a role changes level (2026-11-12: Practice Lead moved from practice to **group** scope), its permissions are reset to the defaults and assignments left at the old level are removed — practice-level ones become Practitioner so nobody drops out of their practice. The script prints those people: re-appoint them as group Leads from the Practices page.
 
 ## Verify after deploy
 

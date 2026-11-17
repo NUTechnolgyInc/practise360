@@ -10,6 +10,7 @@ const GROUPS = [
   { type: "platform", label: "Platform" },
   { type: "app", label: "Apps" },
   { type: "practice", label: "Practices" },
+  { type: "group", label: "Practice groups" },
 ];
 
 /**

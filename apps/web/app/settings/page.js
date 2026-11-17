@@ -3,7 +3,8 @@
 import { PortalShell } from "@/components/auth/portal-shell";
 import { useSession } from "@/components/auth/session-provider";
 import { PageHeader } from "@/components/layout";
-import { Badge, Card, CardHeader, Table, TBody, TD, TH, THead, TR, UserChip } from "@/components/ui";
+import { Badge, Card, CardHeader, Table, TBody, TD, TH, THead, TR } from "@/components/ui";
+import { PersonChip } from "@/components/people/person-link";
 
 function Settings() {
   const { me } = useSession();
@@ -14,7 +15,7 @@ function Settings() {
       <Card>
         <CardHeader title="Account" />
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <UserChip name={me.displayName} subtitle={me.username} size="lg" />
+          <PersonChip person={me} subtitle={me.username} size="lg" />
           <Badge variant="warning">Signed in with dev password</Badge>
         </div>
       </Card>

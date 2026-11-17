@@ -24,17 +24,27 @@ const PERMISSIONS = [
   ["practices.practice.archive", "practices", "Archive practices"],
   ["practices.practice.view", "practices", "View practices"],
   ["practices.members.view", "practices", "View practice members"],
-  ["practices.members.manage", "practices", "Add and remove practice members"],
+  ["practices.members.manage", "practices", "Add and remove practice members and move them between groups"],
+  ["practices.group.manage", "practices", "Create, rename and delete groups in a practice"],
+  ["practices.group.update", "practices", "Run a group: edit its overview and files, and add or remove its members"],
   ["practices.roles.view", "practices", "View roles in a practice"],
   ["practices.roles.manage", "practices", "Create and edit custom roles"],
   ["practices.roles.assign", "practices", "Assign roles to members"],
-  ["cert.catalog.manage", "cert-tracker", "Maintain the certification catalog"],
+  ["practices.contribution.view", "practices", "View contributions in a practice"],
+  ["practices.contribution.create", "practices", "Start a contribution, request to join or accept an invite"],
+  ["practices.contribution.update:own", "practices", "Edit and log progress on contributions you own or contribute to"],
+  ["practices.contribution.manage", "practices", "Edit, log progress and manage people on any contribution in the practice"],
+  ["practices.contribution.review", "practices", "First review of submitted contributions (Lead step)"],
+  ["practices.contribution.approve", "practices", "Final approval that publishes a contribution (Manager step)"],
+  ["cert.catalog.manage", "cert-tracker", "Edit or retire any catalog entry"],
+  ["cert.catalog.create", "cert-tracker", "Add certifications and courses to the shared catalog"],
   ["cert.catalog.view", "cert-tracker", "View the certification catalog"],
-  ["cert.plan.manage:own", "cert-tracker", "Manage own certification plans"],
+  ["cert.plan.manage:own", "cert-tracker", "Plan your own certifications and submit completions"],
   ["cert.plan.view", "cert-tracker", "View plans of practice members"],
-  ["cert.plan.suggest", "cert-tracker", "Suggest a certification"],
-  ["cert.plan.assign", "cert-tracker", "Assign a certification with a due date"],
-  ["cert.plan.verify", "cert-tracker", "Verify a completed certification"],
+  ["cert.plan.suggest", "cert-tracker", "Recommend a certification to a practice member"],
+  ["cert.plan.assign", "cert-tracker", "Assign a mandatory certification with a due date"],
+  ["cert.plan.review", "cert-tracker", "First review of a completed certification (Lead step)"],
+  ["cert.plan.verify", "cert-tracker", "Final approval of a completed certification (Manager step)"],
   ["cert.reports.view", "cert-tracker", "View certification reports"],
   ["ai.admin.manage", "ai-tracker", "Administer the AI Tracker"],
   ["ai.items.create", "ai-tracker", "Create AI initiatives"],
@@ -53,11 +63,25 @@ const CUSTOM_ROLE_PERMISSIONS = [
   ...startsWith("practices.").filter((k) => !["practices.practice.create", "practices.practice.archive"].includes(k)),
   ...startsWith("cert.plan."),
   "cert.catalog.view",
+  "cert.catalog.create",
   ...startsWith("ai.usage."),
 ];
 
 // Every practice member submits a monthly Claude usage report, which also makes AI Tracker visible to them.
-const PRACTICE_BASE = ["practices.practice.view", "practices.members.view", "cert.catalog.view", "ai.usage.manage:own"];
+// Every practice member can also see, start and work on contributions in their practice.
+const PRACTICE_BASE = [
+  "practices.practice.view",
+  "practices.members.view",
+  "cert.catalog.view",
+  "ai.usage.manage:own",
+  "practices.contribution.view",
+  "practices.contribution.create",
+  "practices.contribution.update:own",
+];
+// Lead and Manager both run the review step (a Manager covers it when the owner is the only Lead); only Managers publish.
+const CONTRIBUTION_REVIEW = ["practices.contribution.manage", "practices.contribution.review"];
+// Leads and Managers recommend/assign certs, add new ones to the shared catalog and run the Lead review step.
+const CERT_LEAD = ["cert.plan.view", "cert.plan.suggest", "cert.plan.assign", "cert.plan.review", "cert.catalog.create"];
 
 // assignableFrom = the shallowest scope the actor's assign permission may come from.
 const SYSTEM_ROLES = [
@@ -70,7 +94,7 @@ const SYSTEM_ROLES = [
     assignableFrom: "platform",
     // rbac.md §5 needs Practices Admin to appoint Managers, so it must hold every Manager permission
     // (escalation guard). The §4 table omitted the cert.plan.* ones — added here, see rbac.md change log.
-    permissions: [...startsWith("practices."), "cert.catalog.view", ...startsWith("cert.plan."), "cert.reports.view", ...startsWith("ai.usage.")],
+    permissions: [...startsWith("practices."), "cert.catalog.view", "cert.catalog.create", ...startsWith("cert.plan."), "cert.reports.view", ...startsWith("ai.usage.")],
   },
   {
     _id: "practice_manager",
@@ -84,17 +108,26 @@ const SYSTEM_ROLES = [
       "practices.roles.view",
       "practices.roles.manage",
       "practices.roles.assign",
+      "practices.group.manage",
+      "practices.group.update",
+      ...CONTRIBUTION_REVIEW,
+      "practices.contribution.approve",
       ...startsWith("cert.plan."),
+      "cert.catalog.create",
       "cert.reports.view",
       "ai.usage.view",
     ],
   },
   {
+    // Leads a group inside a practice (rbac.md §4 "Practices and groups"). Holds only the Lead's extras: a Lead is
+    // also a practice member (Practitioner or another practice role), which gives the rest. Granted at group scope by
+    // the practice's Manager or Practices Admin — never by a Lead. roles.view is read across the Lead's practice.
+    // group.update lets them run their own group (overview, who's in it) — owner's decision 2026-11-13.
     _id: "practice_lead",
     name: "Practice Lead",
-    scopeType: "practice",
+    scopeType: "group",
     assignableFrom: "practice",
-    permissions: [...PRACTICE_BASE, "practices.roles.view", "cert.plan.view", "cert.plan.suggest", "cert.plan.assign", "cert.plan.manage:own"],
+    permissions: [...CONTRIBUTION_REVIEW, ...CERT_LEAD, "practices.roles.view", "practices.group.update"],
   },
   {
     _id: "practitioner",
@@ -116,4 +149,11 @@ const SYSTEM_ROLES = [
   },
 ].map((r) => ({ isSystem: true, scopeId: null, ...r }));
 
-module.exports = { APPS, PRACTICES, PERMISSIONS, SYSTEM_ROLES, CUSTOM_ROLE_PERMISSIONS };
+// One holder per scope (owner's decision): a practice has one Manager, a group one Lead. Choosing a new one replaces
+// the current holder from the Practices page; the generic grant refuses a second one.
+const SINGLE_HOLDER_ROLES = ["practice_manager", "practice_lead"];
+
+// Practice ids that would collide with static routes under /practices (web app pages and API sub-routes).
+const RESERVED_PRACTICE_IDS = ["contributions", "new", "people"];
+
+module.exports = { APPS, PRACTICES, PERMISSIONS, SYSTEM_ROLES, CUSTOM_ROLE_PERMISSIONS, SINGLE_HOLDER_ROLES, RESERVED_PRACTICE_IDS };

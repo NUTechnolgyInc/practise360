@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { Trash2 } from "lucide-react";
-import { Badge, Button, EmptyState, Modal, UserChip, useToast } from "@/components/ui";
+import { Badge, Button, EmptyState, Modal, useToast } from "@/components/ui";
+import { PersonChip } from "@/components/people/person-link";
 import { api } from "@/lib/api";
 import { GrantRoleForm } from "./grant-role-form";
 
@@ -29,7 +30,7 @@ export function UserAccessModal({ user, assignable, onClose, onChanged }) {
   return (
     <>
       <Modal open onClose={onClose} title="Manage access" description="Changes apply on the user's next request.">
-        <UserChip name={user.displayName} subtitle={user.username} size="lg" className="mb-5" />
+        <PersonChip person={user} subtitle={user.username} size="lg" className="mb-5" />
         <h3 className="mb-2 text-xs font-bold uppercase tracking-wider text-nu-navy">Current roles</h3>
         {user.assignments.length === 0 ? (
           <EmptyState title="No roles in your scopes" className="p-6" />

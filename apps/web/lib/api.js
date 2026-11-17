@@ -15,6 +15,17 @@ export class ApiError extends Error {
   }
 }
 
+/** Fired when a request that carried a token comes back 401 (expired or revoked session). SessionProvider listens. */
+export const SESSION_EXPIRED_EVENT = "p360:session-expired";
+
+// Without this, only the first /me call noticed an expired token: every later screen showed its own
+// misleading error ("You can't start a contribution…") instead of asking the person to sign in again.
+function checkSession(res, token) {
+  if (res.status !== 401 || !token) return;
+  tokenStore.clear();
+  window.dispatchEvent(new Event(SESSION_EXPIRED_EVENT));
+}
+
 export async function api(path, { method = "GET", body } = {}) {
   const token = tokenStore.get();
   let res;
@@ -27,6 +38,8 @@ export async function api(path, { method = "GET", body } = {}) {
   } catch {
     throw new ApiError("Can't reach the server. Is the API running?", 0);
   }
+  // /auth/* 401s mean "wrong password", not an expired session.
+  if (!path.startsWith("/auth/")) checkSession(res, token);
   if (res.status === 204) return null;
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new ApiError(data.error || `Request failed (${res.status})`, res.status);
@@ -39,11 +52,15 @@ const authHeader = () => {
 };
 
 async function send(path, init) {
+  const token = tokenStore.get();
+  let res;
   try {
-    return await fetch(`${BASE}${path}`, { ...init, headers: { ...authHeader(), ...init?.headers } });
+    res = await fetch(`${BASE}${path}`, { ...init, headers: { ...authHeader(), ...init?.headers } });
   } catch {
     throw new ApiError("Can't reach the server. Is the API running?", 0);
   }
+  checkSession(res, token);
+  return res;
 }
 
 async function failed(res) {

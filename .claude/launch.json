@@ -91,6 +91,66 @@
         "NEXT_DIST_DIR": ".next-3",
         "NEXT_PUBLIC_API_URL": "http://localhost:4002"
       }
+    },
+    {
+      "name": "stack-3",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": [
+        "-c",
+        "PORT=4002 WEB_ORIGIN=http://localhost:3102 npm run dev:api & NEXT_DIST_DIR=.next-3 NEXT_PUBLIC_API_URL=http://localhost:4002 npm run dev -w web -- -p 3102; wait"
+      ],
+      "port": 3102,
+      "autoPort": false
+    },
+    {
+      "name": "e2e-api",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "apps/api/src/local.js"
+      ],
+      "port": 4100,
+      "autoPort": false,
+      "env": {
+        "PORT": "4100",
+        "MONGODB_URI": "mongodb://127.0.0.1:27017/practise360_e2e",
+        "AUTH_MODE": "dev",
+        "JWT_SECRET": "e2e-local-stack-only-not-a-real-secret",
+        "WEB_ORIGIN": "http://localhost:3200"
+      }
+    },
+    {
+      "name": "e2e-web",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": [
+        "-c",
+        "npm run build -w web && npm run start -w web -- -p 3200"
+      ],
+      "port": 3200,
+      "autoPort": false,
+      "env": {
+        "NEXT_DIST_DIR": ".next-e2e",
+        "NEXT_PUBLIC_API_URL": "http://localhost:4100",
+        "NEXT_TELEMETRY_DISABLED": "1"
+      }
+    },
+    {
+      "name": "e2e-web-dev",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev",
+        "-w",
+        "web",
+        "--",
+        "-p",
+        "3200"
+      ],
+      "port": 3200,
+      "autoPort": false,
+      "env": {
+        "NEXT_DIST_DIR": ".next-e2e-dev",
+        "NEXT_PUBLIC_API_URL": "http://localhost:4100"
+      }
     }
   ]
 }

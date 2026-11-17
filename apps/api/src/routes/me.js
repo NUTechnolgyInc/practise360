@@ -18,6 +18,7 @@ router.get("/", authenticate, (req, res) => {
     grants: user.grants.map((g) => ({ ...g, scopeLabel: describeScope(g, tree) })),
     apps: visibleApps(user, tree.apps).map(({ _id, name }) => ({ id: _id, name })),
     practices: tree.practices.map(({ _id, appId, name }) => ({ id: _id, appId, name })),
+    groups: tree.groups.map(({ _id, practiceId, name }) => ({ id: _id, practiceId, name })),
   });
 });
 

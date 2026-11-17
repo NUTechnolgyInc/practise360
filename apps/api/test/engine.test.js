@@ -1,9 +1,10 @@
 // Escalation guard + can() against the seeded catalog (docs/rbac.md §5–§6). No DB needed.
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { can, checkGrant, visibleApps } = require("../src/rbac/engine");
+const { can, checkGrant, memberScope, scopeChain, visibleApps } = require("../src/rbac/engine");
 const { APPS, PRACTICES, SYSTEM_ROLES } = require("../src/rbac/catalog");
 const { CUSTOM_ROLES } = require("../src/seed/data");
+const { DE, FULLSTACK, QA_AUTO, treeWith } = require("./fixtures");
 
 const roles = Object.fromEntries([...SYSTEM_ROLES, ...CUSTOM_ROLES].map((r) => [r._id, r]));
 const userWith = (...assignments) => ({
@@ -11,12 +12,15 @@ const userWith = (...assignments) => ({
   grants: assignments.map(([roleId, scopeType, scopeId = null]) => ({ scopeType, scopeId, permissions: roles[roleId].permissions })),
 });
 const practice = (id) => ({ type: "practice", id });
-const grant = (actor, roleId, scope) => checkGrant(actor, roles[roleId], scope, PRACTICES).ok;
+const group = (id) => ({ type: "group", id });
+const TREE = treeWith();
+const grant = (actor, roleId, scope) => checkGrant(actor, roles[roleId], scope, TREE).ok;
 
 const superAdmin = userWith(["super_admin", "platform"]);
 const practicesAdmin = userWith(["practices_admin", "app", "practices"]);
 const deManager = userWith(["practice_manager", "practice", "digital-engineering"]);
-const deLead = userWith(["practice_lead", "practice", "digital-engineering"]);
+// A Lead is a practice member (Practitioner) who also leads a group.
+const deLead = userWith(["practitioner", "practice", DE], ["practice_lead", "group", FULLSTACK]);
 
 test("role granted at a parent applies to children", () => {
   assert.ok(can(practicesAdmin, "practices.members.manage", practice("qa"), undefined, PRACTICES));
@@ -40,7 +44,9 @@ test("Practices Admin appoints Managers in any practice, but not app admins", ()
 });
 
 test("Practice Manager grants Lead/Practitioner only in their practice, never Manager", () => {
-  assert.ok(grant(deManager, "practice_lead", practice("digital-engineering")));
+  assert.ok(grant(deManager, "practice_lead", group(FULLSTACK)), "Leads are appointed per group");
+  assert.ok(!grant(deManager, "practice_lead", practice(DE)), "no practice-wide Lead any more");
+  assert.ok(!grant(deManager, "practice_lead", group(QA_AUTO)), "not in another practice's groups");
   assert.ok(grant(deManager, "practitioner", practice("digital-engineering")));
   assert.ok(!grant(deManager, "practitioner", practice("qa")));
   assert.ok(!grant(deManager, "practice_manager", practice("digital-engineering")));
@@ -48,6 +54,29 @@ test("Practice Manager grants Lead/Practitioner only in their practice, never Ma
 
 test("Practice Lead can't assign roles", () => {
   assert.ok(!grant(deLead, "practitioner", practice("digital-engineering")));
+  assert.ok(!grant(deLead, "practice_lead", group(FULLSTACK)), "not even another Lead for their own group");
+});
+
+test("a group sits under its practice: practice and app grants reach it, sibling groups don't", () => {
+  assert.deepEqual(scopeChain(group(FULLSTACK), TREE), [group(FULLSTACK), practice(DE), { type: "app", id: "practices" }, { type: "platform", id: null }]);
+  assert.ok(can(deManager, "practices.contribution.review", group(FULLSTACK), undefined, TREE));
+  assert.ok(can(practicesAdmin, "practices.contribution.review", group(QA_AUTO), undefined, TREE));
+  assert.ok(can(deLead, "practices.contribution.review", group(FULLSTACK), undefined, TREE));
+  assert.ok(!can(deLead, "practices.contribution.review", group("digital-engineering-devops"), undefined, TREE), "a Lead reaches only their group");
+  assert.ok(!can(deLead, "practices.contribution.review", practice(DE), undefined, TREE), "nor the practice as a whole");
+});
+
+test("Practices Admin appoints Leads in any group; unknown groups are refused", () => {
+  assert.ok(grant(practicesAdmin, "practice_lead", group(QA_AUTO)));
+  assert.ok(!grant(practicesAdmin, "practice_lead", group("no-such-group")));
+  assert.ok(!can(deManager, "practices.contribution.review", group("no-such-group"), undefined, TREE), "unknown groups fail closed");
+});
+
+test("memberScope resolves a member's group, or the practice when they're in none", () => {
+  const tree = treeWith([["u1", FULLSTACK]]);
+  assert.deepEqual(memberScope(tree, DE, "u1"), group(FULLSTACK));
+  assert.deepEqual(memberScope(tree, DE, "u2"), practice(DE));
+  assert.deepEqual(memberScope(tree, "qa", "u1"), practice("qa"), "membership is per practice");
 });
 
 test("custom roles are only grantable in their owning practice", () => {

@@ -2,10 +2,12 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Bot, Home, Loader2, Settings, ShieldCheck } from "lucide-react";
+import { Award, Bot, Home, Lightbulb, Loader2, Settings, ShieldCheck } from "lucide-react";
 import { AppShell } from "@/components/layout";
 import { NoAccess } from "@/components/ui";
+import { practicesHome } from "@/components/practices/practices-nav";
 import { canAnywhere, RBAC_PORTAL_PERMS } from "@/lib/can";
+import { profilePath } from "@/lib/people";
 import { useSession } from "./session-provider";
 
 /** Authenticated frame: redirects to /login when signed out and builds nav from the user's grants. */
@@ -28,6 +30,8 @@ export function PortalShell({ breadcrumbs, requires, children }) {
   const showAccess = canAnywhere(me, ...RBAC_PORTAL_PERMS);
   const navItems = [
     { href: "/", label: "Home", icon: Home },
+    ...(canAnywhere(me, "practices.practice.view", "practices.contribution.view") ? [{ href: practicesHome(me), label: "Practices", icon: Lightbulb }] : []),
+    ...(me.apps.some((a) => a.id === "cert-tracker") ? [{ href: "/certifications", label: "Certifications", icon: Award }] : []),
     ...(me.apps.some((a) => a.id === "ai-tracker") ? [{ href: "/ai-tracker", label: "AI Tracker", icon: Bot }] : []),
     ...(showAccess ? [{ href: "/access-control", label: "Access control", icon: ShieldCheck }] : []),
     { href: "/settings", label: "Settings", icon: Settings },
@@ -35,6 +39,7 @@ export function PortalShell({ breadcrumbs, requires, children }) {
   const user = {
     name: me.displayName,
     username: me.username,
+    profileHref: profilePath(me.id),
     assignments: me.grants.map((g) => ({ role: g.roleName, scope: g.scopeLabel })),
   };
   const allowed = !requires || canAnywhere(me, ...requires);

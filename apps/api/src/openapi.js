@@ -1,6 +1,11 @@
 // OpenAPI 3.0 description of the API, served at /openapi.json and rendered by Swagger UI at /docs.
 // Hand-written so it reads like a contract; test/openapi.test.js fails if a route is added without documenting it.
 
+const practices = require("./openapi-practices");
+const contributions = require("./openapi-contributions");
+const certifications = require("./openapi-certifications");
+const people = require("./openapi-people");
+
 const err = (description) => ({ description, content: { "application/json": { schema: { $ref: "#/components/schemas/Error" } } } });
 const json = (description, schema) => ({ description, content: { "application/json": { schema } } });
 const ref = (name) => ({ $ref: `#/components/schemas/${name}` });
@@ -35,6 +40,10 @@ function buildSpec({ serverUrl } = {}) {
       { name: "Roles", description: "Permission catalog, system and custom roles" },
       { name: "Users", description: "User directory and role assignments (escalation guard applies)" },
       { name: "AI Tracker", description: "Monthly Claude usage reports (PDF). Visibility follows the owner's practice scope." },
+      practices.tag,
+      contributions.tag,
+      certifications.tag,
+      people.tag,
     ],
     components: {
       securitySchemes: {
@@ -45,14 +54,18 @@ function buildSpec({ serverUrl } = {}) {
         Forbidden: err("Signed in but missing the required permission at this scope"),
       },
       schemas: {
+        ...practices.schemas,
+        ...contributions.schemas,
+        ...certifications.schemas,
+        ...people.schemas,
         Error: { type: "object", required: ["error"], properties: { error: { type: "string", example: "Missing permission practices.roles.manage" } } },
         Id: { type: "object", required: ["id"], properties: { id: { type: "string" } } },
-        ScopeType: { type: "string", enum: ["platform", "app", "practice"] },
+        ScopeType: { type: "string", enum: ["platform", "app", "practice", "group"] },
         Scope: {
           type: "object",
           properties: {
             type: ref("ScopeType"),
-            id: { type: "string", nullable: true, description: "null for platform; app id or practice id otherwise", example: "qa" },
+            id: { type: "string", nullable: true, description: "null for platform; app, practice or group id otherwise", example: "qa" },
             label: { type: "string", example: "QA" },
           },
         },
@@ -78,7 +91,10 @@ function buildSpec({ serverUrl } = {}) {
         LoginRequest: {
           type: "object",
           required: ["username", "password"],
-          properties: { username: { type: "string", example: "alex.rivera" }, password: { type: "string", format: "password", example: "[REDACTED]" } },
+          properties: {
+            username: { type: "string", example: "alex.rivera", description: "Username, or the email of someone who joined from an invitation" },
+            password: { type: "string", format: "password", example: "[REDACTED]" },
+          },
         },
         Token: { type: "object", required: ["token"], properties: { token: { type: "string", description: "JWT, valid 8h" } } },
         Grant: {
@@ -237,8 +253,49 @@ function buildSpec({ serverUrl } = {}) {
           responses: {
             200: json("Signed in", ref("Token")),
             400: err("Username or password missing"),
-            401: err("Invalid username or password"),
+            401: err("Invalid username, email or password"),
             404: err("Password login is disabled"),
+          },
+        },
+      },
+      "/invites/{token}": {
+        parameters: [{ name: "token", in: "path", required: true, schema: { type: "string" }, description: "Token from the invitation email" }],
+        get: {
+          tags: ["Auth"],
+          summary: "Look up an invitation (public)",
+          description: "What the join page shows. No session needed — the token is the credential.",
+          responses: {
+            200: json("The invitation", {
+              type: "object",
+              properties: {
+                email: { type: "string" },
+                kind: { type: "string", enum: ["member", "manager", "lead"] },
+                role: { type: "string", example: "Manager of Digital Engineering" },
+                practice: ref("NamedRef"),
+                invitedBy: { type: "string", description: "Inviter's display name" },
+                expiresAt: { type: "string", format: "date-time" },
+                hasAccount: { type: "boolean", description: "The email already has an account (e.g. it accepted another invitation)" },
+                suggestedName: { type: "string" },
+              },
+            }),
+            404: err("No such invitation"),
+            410: err("Already used, withdrawn, expired, or the inviter can no longer make this appointment"),
+          },
+        },
+      },
+      "/invites/{token}/accept": {
+        parameters: [{ name: "token", in: "path", required: true, schema: { type: "string" } }],
+        post: {
+          tags: ["Auth"],
+          summary: "Accept an invitation and sign in (public)",
+          description: "Creates the account for the invited email (or reuses it), applies what the invitation grants — re-checked against the inviter's grants now — and returns a session token. The link then stops working.",
+          requestBody: { content: { "application/json": { schema: { type: "object", properties: { displayName: { type: "string", maxLength: 80 } } } } } },
+          responses: {
+            200: json("Signed in", { type: "object", properties: { token: { type: "string" }, practiceId: { type: "string" }, username: { type: "string" } } }),
+            403: err("The account for this email is deactivated"),
+            404: err("No such invitation"),
+            409: err("The appointment conflicts with the practice's current structure"),
+            410: err("Already used, withdrawn, expired, or the inviter can no longer make this appointment"),
           },
         },
       },
@@ -421,6 +478,10 @@ function buildSpec({ serverUrl } = {}) {
           },
         },
       },
+      ...practices.paths,
+      ...contributions.paths,
+      ...certifications.paths,
+      ...people.paths,
     },
   };
 }

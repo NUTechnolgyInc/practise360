@@ -11,7 +11,7 @@ import { DemoUsers } from "./demo-users";
 export function LoginForm() {
   const router = useRouter();
   const toast = useToast();
-  const { signIn } = useSession();
+  const { signIn, expired } = useSession();
   const [config, setConfig] = useState(null);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -52,9 +52,14 @@ export function LoginForm() {
 
   return (
     <div>
+      {expired && (
+        <p role="status" className="mb-4 rounded-xl bg-amber-50 p-3 text-xs font-semibold text-amber-800">
+          Your session expired. Sign in again to continue.
+        </p>
+      )}
       <form onSubmit={onSubmit} className="space-y-4" noValidate>
-        <Field id="username" label="Username">
-          <Input id="username" autoComplete="username" required value={username} onChange={(e) => setUsername(e.target.value)} placeholder="e.g. de.lead" />
+        <Field id="username" label="Username or email">
+          <Input id="username" autoComplete="username" required value={username} onChange={(e) => setUsername(e.target.value)} placeholder="e.g. de.lead or you@nulogic.io" />
         </Field>
         <Field id="password" label="Password" error={error || undefined}>
           {(a11y) => (

@@ -34,7 +34,7 @@ async function authenticate(req, res, next) {
 /** Route guard: `scopeOf(req)` returns the scope the request touches. */
 function requirePermission(permission, scopeOf = () => ({ type: "platform", id: null })) {
   return (req, res, next) => {
-    if (can(req.user, permission, scopeOf(req), undefined, req.tree.practices)) return next();
+    if (can(req.user, permission, scopeOf(req), undefined, req.tree)) return next();
     res.status(403).json({ error: `Missing permission ${permission}` });
   };
 }

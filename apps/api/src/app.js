@@ -11,7 +11,10 @@ if (process.env.AUTH_MODE === "dev" && process.env.VERCEL_ENV === "production") 
 const app = express();
 const origins = (process.env.WEB_ORIGIN || "http://localhost:3000").split(",").map((o) => o.trim());
 app.use(cors({ origin: origins }));
-app.use(express.json());
+// 1 MB: contribution descriptions converted from .docx can pass the 100 KB default. File-upload routes read
+// the raw body themselves, so an uploaded .json attachment must not be parsed here.
+const isFileUpload = (req) => /\/files(\?|$)/.test(req.url);
+app.use(express.json({ limit: "1mb", type: (req) => !isFileUpload(req) && /json/.test(req.headers["content-type"] || "") }));
 
 app.get("/", (req, res) => res.json({ name: "practise360-api" }));
 app.get("/health", (req, res) => res.json({ status: "ok" }));
@@ -23,13 +26,21 @@ app.get("/docs", (req, res) => res.type("html").send(docsHtml("/openapi.json")))
 
 app.use("/auth", require("./routes/auth"));
 app.use("/me", require("./routes/me"));
+// Public: the link in an invitation email is the credential (routes/invites.js).
+app.use("/invites", require("./routes/invites"));
 app.use("/rbac", authenticate, require("./routes/rbac-roles"), require("./routes/rbac-users"));
 app.use("/ai/usage-reports", authenticate, require("./routes/ai-usage-reports"));
+app.use("/practices", authenticate, require("./routes/practices"));
+app.use("/contributions", authenticate, require("./routes/contributions"));
+app.use("/certifications", authenticate, require("./routes/certifications"));
+app.use("/people", authenticate, require("./routes/people"));
 
 app.use((req, res) => res.status(404).json({ error: "Not found" }));
 // eslint-disable-next-line no-unused-vars
 app.use((err, req, res, next) => {
-  if (err.type === "entity.too.large") return res.status(413).json({ error: "File is too large (max 4 MB)" });
+  if (err.type === "entity.too.large") return res.status(413).json({ error: "Too large (files max 4 MB, text max 1 MB)" });
+  // A truncated or invalid JSON body is the caller's mistake, not a server fault — don't log it as a 500.
+  if (err.type === "entity.parse.failed") return res.status(400).json({ error: "Request body isn't valid JSON" });
   console.error(err);
   res.status(500).json({ error: "Something went wrong" });
 });

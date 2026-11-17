@@ -49,12 +49,13 @@ scripts/tracker/           Tracker parser + local Kanban board
 
 ## RBAC Summary (full detail in `docs/rbac.md`)
 
-- **Scope tree**: `platform → app (practices | cert-tracker | ai-tracker) → practice (digital-engineering | platform | qa | ai)`. A role granted at a parent applies to all children.
+- **Scope tree**: `platform → app (practices | cert-tracker | ai-tracker) → practice (digital-engineering | platform | qa | ai, + more created by Practices Admin) → group (e.g. digital-engineering-fullstack)`. A role granted at a parent applies to all children.
 - **Assignment** = `{ userId, roleId, scopeType, scopeId }`. Users can hold many.
 - **Permission keys**: `<app>.<resource>.<action>`, `:own` suffix = only on records the user owns.
 - **System roles**: Super Admin, Practices Admin, Practice Manager, Practice Lead, Practitioner, Cert Admin, AI Admin, AI Member. Plus **custom roles** created inside a practice.
 - **App visibility is derived** from assignments — no separate app-access table.
-- **Cert Tracker reuses practice scope** — a Lead's cert permissions only reach their practice's members.
+- **Groups**: each practice has one Manager and named groups, each with one Practice Lead (a group-scoped role). A member sits in at most one group per practice. Contributions and cert plans are checked at the owner's current group, so a **Lead only reaches their own group's members**; the Manager reaches the whole practice.
+- **Cert Tracker reuses practice/group scope** — no scopes of its own.
 - **Escalation guard**: to grant role R at scope S you need the assign permission at S *and* every permission in R; roles carry `assignableFrom` (Practice Manager is only grantable from app scope).
 - **Enforce on the API**, always. The web app uses the same data only to hide/show UI — never as the security boundary.
 
@@ -104,7 +105,7 @@ View it as a Kanban board: `npm run tracker` → http://localhost:4777.
 - `qa-runner` agent — background executor used by `qa-test-run` for long passes.
 
 ### Before Pushing
-1. `npm run build` passes (lint/test scripts get added as the codebase grows — run them once they exist).
+1. `npm run build` passes, `npm test -w api` passes, and `npm run test:e2e` passes (or every failure is a known, logged defect).
 2. Tracker row + Change Log updated if status changed; `CHANGELOG.md` updated if user-visible.
 3. One commit per atomic change; the message says *why*.
 
@@ -131,7 +132,7 @@ Project decisions and context live in `/Users/lalrishav/.claude/projects/-Users-
 1. Can a practitioner belong to more than one practice?
 2. Can a Practice Manager appoint another Manager, or only Practices Admin?
 3. Custom roles: per practice only, or also global templates?
-4. Does a Lead see all practitioners in the practice, or only direct reportees?
+4. ~~Does a Lead see all practitioners in the practice, or only direct reportees?~~ Answered 2026-11-12: Leads lead a group and act only on its members.
 5. AI Tracker: entities and roles beyond Admin/Member?
 
 ---

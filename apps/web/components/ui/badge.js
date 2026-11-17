@@ -22,18 +22,25 @@ export function Badge({ className, variant, ...props }) {
 
 // Single source for status → colour so the same status never shows in two colours.
 const STATUS_VARIANT = {
-  // Certification plan lifecycle
-  Suggested: "teal",
+  // Certification plan lifecycle (Lead review / Manager review / Clarification needed / Declined shared with contributions)
+  Recommended: "teal",
   Planned: "neutral",
   "In Progress": "purple",
-  Completed: "warning",
-  Verified: "success",
+  Completed: "success",
+  Dropped: "neutral",
   Overdue: "danger",
+  Expired: "danger",
   // AI initiative lifecycle
   Idea: "neutral",
   PoC: "purple",
   Pilot: "primary",
   Production: "success",
+  // Practice contribution lifecycle (In Progress shared with cert plans above)
+  "Lead review": "primary",
+  "Manager review": "primary",
+  "Clarification needed": "warning",
+  Published: "success",
+  Declined: "danger",
   // Claude usage report submission
   Submitted: "success",
   Pending: "warning",

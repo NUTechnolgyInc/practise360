@@ -1,7 +1,7 @@
 const crypto = require("crypto");
 const express = require("express");
 const { Permission, Role, RoleAssignment } = require("../models");
-const { can, holdsExactly } = require("../rbac/engine");
+const { can, canWithin, holdsExactly } = require("../rbac/engine");
 const { CUSTOM_ROLE_PERMISSIONS } = require("../rbac/catalog");
 const { requireAnyScope } = require("../middleware/auth");
 
@@ -37,7 +37,8 @@ router.get(
     const countOf = new Map(counts.map((c) => [c._id, c.n]));
 
     const manageSystem = can(user, "platform.roles.manage", PLATFORM, undefined, tree.practices);
-    const visible = roles.filter((r) => r.isSystem || can(user, "practices.roles.view", practiceScope(r.scopeId), undefined, tree.practices));
+    // canWithin: a group Lead holds roles.view on their group, and reads the roles of the practice it belongs to.
+    const visible = roles.filter((r) => r.isSystem || canWithin(user, "practices.roles.view", r.scopeId, tree));
     res.json(
       visible.map((r) => ({
         id: r._id,

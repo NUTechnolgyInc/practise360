@@ -97,12 +97,14 @@ Import primitives from `@/components/ui` and layout from `@/components/layout`.
 | `Tabs` | Section switching inside a page (practice detail, cert tracker views). Controlled — the page owns the value. |
 | `Table`, `THead`, `TBody`, `TR`, `TH`, `TD` | Tabular lists (members, team plans, permission matrix). |
 | `StatTile` | KPI numbers in overview grids. Tones: `purple/success/info/danger/neutral`. |
+| `StatsToggle` + `useShowStats()` | Every page's count tiles start **hidden**: put `StatsToggle` in the `PageHeader` actions and give the tile grid `id` + `hidden={!shown}`. One remembered preference applies on every page. |
 | `Progress` | Completion bars. Use `aria-label` instead of `label` when there's no room for text. |
-| `Avatar` / `UserChip` | Any person reference. Initials are derived from the name. |
+| `Avatar` / `UserChip` | Any person reference. Initials are derived from the name. `UserChip href` makes it a link; `Avatar size="xl"` is for profile headers. |
+| `PersonChip` / `PersonLink` (`components/people`) | **Every displayed person name** in app screens — they link to the person's profile (`/people/:id`). `PersonLink` for names inside text ("Approved by …", timelines), `PersonChip` for avatar + name rows. Keep pickers, toasts and confirmations plain text, and never put one inside another link or button. |
 | `EmptyState` / `NoAccess` | Empty lists; routes the user can't access. Never leave a blank area. |
 | `useToast()` | Feedback after a mutation: `toast("Saved")`, `toast("Failed", "error")`. |
 | `AppShell` | Wraps every authenticated page: brand bar, sidebar, mobile drawer, top bar, user menu. |
-| `PageHeader` | First element on every page: title, description, back link, actions/tabs. |
+| `PageHeader` | First element on every page: title, description, back link, actions/tabs; `leading` for an avatar or icon before the title. |
 | `HeroBanner` | Landing views only (app launcher welcome). |
 | `Logo` | NULogic logo — `onDark` for the white wordmark, `variant="icon"` for the g-mark. |
 
