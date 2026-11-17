@@ -3,9 +3,10 @@ const express = require("express");
 const cors = require("cors");
 const { authenticate } = require("./middleware/auth");
 
-if (process.env.AUTH_MODE === "dev" && process.env.VERCEL_ENV === "production") {
-  // Dev password login must never reach production (CLAUDE.md → Auth).
-  throw new Error("AUTH_MODE=dev is not allowed in production");
+// Dev password login must never reach a real production (CLAUDE.md → Auth). A demo deployment on seeded,
+// synthetic data can opt in explicitly, so the guard can't be switched off by setting AUTH_MODE alone.
+if (process.env.AUTH_MODE === "dev" && process.env.VERCEL_ENV === "production" && process.env.ALLOW_DEMO_LOGIN_IN_PRODUCTION !== "true") {
+  throw new Error("AUTH_MODE=dev is not allowed in production (set ALLOW_DEMO_LOGIN_IN_PRODUCTION=true only for a demo on seeded data)");
 }
 
 const app = express();
