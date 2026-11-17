@@ -59,8 +59,8 @@ scripts/tracker/           Tracker parser + local Kanban board
 - **Escalation guard**: to grant role R at scope S you need the assign permission at S *and* every permission in R; roles carry `assignableFrom` (Practice Manager is only grantable from app scope).
 - **Enforce on the API**, always. The web app uses the same data only to hide/show UI — never as the security boundary.
 
-### Auth (dev stop-gap)
-Username + password, password hardcoded to `password` for every seeded user. This must stay behind `AUTH_MODE=dev` and never ship to production. Auth only produces a `userId`; RBAC must not depend on how login works, so SSO can replace it later.
+### Auth
+Google sign-in (`POST /auth/google`, `GOOGLE_CLIENT_ID`) for existing accounts only. Dev stop-gap alongside it: username + password, password hardcoded to `password` for every seeded user. This must stay behind `AUTH_MODE=dev` and never ship to production — the one exception is the demo deployment on seeded data, which opts in with `ALLOW_DEMO_LOGIN_IN_PRODUCTION=true` (owner decision 2026-11-17). Auth only produces a `userId`; RBAC must not depend on how login works, so SSO can replace it later.
 
 ---
 

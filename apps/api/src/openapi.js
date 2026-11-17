@@ -73,7 +73,13 @@ function buildSpec({ serverUrl } = {}) {
           type: "object",
           properties: {
             devLogin: { type: "boolean" },
-            google: { type: "object", properties: { enabled: { type: "boolean" } } },
+            google: {
+              type: "object",
+              properties: {
+                enabled: { type: "boolean", description: "True when the API has GOOGLE_CLIENT_ID set" },
+                clientId: { type: "string", description: "Public OAuth Client ID for Google Identity Services. Only when enabled" },
+              },
+            },
             demoUsers: {
               type: "array",
               description: "Only present when devLogin is true",
@@ -300,7 +306,20 @@ function buildSpec({ serverUrl } = {}) {
         },
       },
       "/auth/google": {
-        post: { tags: ["Auth"], summary: "Google SSO (not implemented yet)", responses: { 501: err("Google sign-in is not available yet") } },
+        post: {
+          tags: ["Auth"],
+          summary: "Sign in with Google",
+          description:
+            "Exchanges a Google ID token (the `credential` Google Identity Services gives the browser) for a session. The token must be issued for this API's `GOOGLE_CLIENT_ID`, the email verified and, when `GOOGLE_ALLOWED_DOMAINS` is set, a Workspace account on one of those domains. Only emails that already have an active account sign in — there is no self-sign-up.",
+          requestBody: body({ type: "object", required: ["credential"], properties: { credential: { type: "string", description: "Google ID token (JWT)" } } }),
+          responses: {
+            200: json("Signed in", ref("Token")),
+            400: err("Credential missing"),
+            401: err("Invalid Google token, unverified email, or a domain that isn't allowed"),
+            403: err("No account for this email, or the account is deactivated"),
+            501: err("Google sign-in isn't configured on this API"),
+          },
+        },
       },
 
       "/me": {

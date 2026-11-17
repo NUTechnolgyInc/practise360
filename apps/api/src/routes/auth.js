@@ -2,6 +2,7 @@ const express = require("express");
 const { connectDb } = require("../db");
 const { Role, RoleAssignment, User } = require("../models");
 const { signToken, isDevAuth } = require("../middleware/auth");
+const { clientId, isGoogleEnabled, verifyGoogleCredential } = require("../lib/google-auth");
 
 const router = express.Router();
 const DEV_PASSWORD = "password";
@@ -9,8 +10,10 @@ const DEV_PASSWORD = "password";
 /** Tells the login page which sign-in options exist, so the dev hint never renders outside AUTH_MODE=dev. */
 router.get("/config", async (req, res, next) => {
   try {
-    if (!isDevAuth()) return res.json({ devLogin: false, google: { enabled: false } });
-    res.json({ devLogin: true, google: { enabled: false }, demoUsers: await demoUsers() });
+    // The Client ID is public (Google shows it in the browser anyway); serving it here keeps it in one env var.
+    const google = isGoogleEnabled() ? { enabled: true, clientId: clientId() } : { enabled: false };
+    if (!isDevAuth()) return res.json({ devLogin: false, google });
+    res.json({ devLogin: true, google, demoUsers: await demoUsers() });
   } catch (err) {
     next(err);
   }
@@ -47,9 +50,26 @@ router.post("/login", async (req, res, next) => {
   }
 });
 
-// Placeholder so the button has a real endpoint to call once Google SSO is wired up.
-router.post("/google", (req, res) => {
-  res.status(501).json({ error: "Google sign-in is not available yet" });
+/** Exchanges a Google ID token for a Practise360 session. Only people who already have an account get in. */
+router.post("/google", async (req, res, next) => {
+  try {
+    if (!isGoogleEnabled()) return res.status(501).json({ error: "Google sign-in is not available yet" });
+    const { credential } = req.body || {};
+    if (!credential || typeof credential !== "string") return res.status(400).json({ error: "Google credential is required" });
+
+    const identity = await verifyGoogleCredential(credential);
+    if (identity.error) return res.status(401).json({ error: identity.error });
+
+    await connectDb();
+    const user = await User.findOne({ email: identity.email }).lean();
+    // No self-sign-up: accounts come from invitations (docs/rbac.md §4), so access always starts from someone who can grant it.
+    if (!user) return res.status(403).json({ error: `There's no Practise360 account for ${identity.email}. Ask your Practice Manager to invite you.` });
+    if (!user.isActive) return res.status(403).json({ error: "This account is deactivated" });
+
+    res.json({ token: signToken(user._id) });
+  } catch (err) {
+    next(err);
+  }
 });
 
 module.exports = router;

@@ -33,7 +33,7 @@ export default function LoginPage() {
         <section className="flex items-center justify-center p-6 md:p-12">
           <div className="w-full max-w-md rounded-3xl border border-gray-200 bg-white p-6 shadow-sm md:p-8">
             <h2 className="text-2xl font-extrabold">Sign in</h2>
-            <p className="mb-6 mt-1 text-xs text-nu-muted-teal">Use your Practise360 username or email, and password.</p>
+            <p className="mb-6 mt-1 text-xs text-nu-muted-teal">Continue with the Google account your invitation was sent to.</p>
             <LoginForm />
           </div>
         </section>

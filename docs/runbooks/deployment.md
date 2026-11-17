@@ -17,13 +17,16 @@ Two Vercel projects from the same repo:
 | Var | Project | Purpose |
 |---|---|---|
 | `NEXT_PUBLIC_API_URL` | web | Base URL of the API |
-| `AUTH_MODE` | api | `dev` enables the hardcoded-password login. **Must not be `dev` in production** — the API refuses to start if it is on a Vercel production deploy. |
+| `AUTH_MODE` | api | `dev` enables the hardcoded-password login. **Must not be `dev` in production** — the API refuses to start if it is on a Vercel production deploy, unless `ALLOW_DEMO_LOGIN_IN_PRODUCTION` is set. |
+| `ALLOW_DEMO_LOGIN_IN_PRODUCTION` | api | `true` lets `AUTH_MODE=dev` run on a Vercel production deploy. **Only for a demo on seeded, synthetic data** — anyone with the URL can sign in as any seeded user, Super Admin included. Remove it (and `AUTH_MODE`) before real people or real data use the deployment. |
 | `MONGODB_URI` | api | MongoDB connection string (e.g. Atlas) |
 | `JWT_SECRET` | api | Signs session tokens. Long random value, different per environment |
 | `WEB_ORIGIN` | api | Web URL(s) allowed by CORS, comma-separated |
 | `WEB_URL` | api | Web app URL used in invitation links (e.g. `https://practise360.example.com`). Optional — defaults to the first `WEB_ORIGIN` |
 | `SMTP_URL` | api | SMTP server for invitation emails, e.g. `smtps://[REDACTED]:[REDACTED]@smtp.example.com:465` (Google Workspace relay, SES, Resend… all work). Unset = emails are only printed to the API log |
 | `MAIL_FROM` | api | Sender, e.g. `Practise360 <no-reply@example.com>`. Must be an address the SMTP provider allows |
+| `GOOGLE_CLIENT_ID` | api | OAuth Client ID for Google sign-in (Google Cloud → Google Auth Platform → Clients, type Web application). Public, not a secret; the web app gets it from `/auth/config`. Unset = no Google button. Add the web URL to the client's **Authorized JavaScript origins** |
+| `GOOGLE_ALLOWED_DOMAINS` | api | Optional comma-separated Workspace domains allowed to sign in with Google (set `nulogic.io` in production). Unset = any verified Google account that has a Practise360 account |
 | `INVITE_EMAIL_DOMAINS` | api | Optional comma-separated allow-list of email domains that can be invited (e.g. `nulogic.io`). Unset = any domain |
 
 Values live in Vercel project settings and local `.env` files (gitignored). Never commit them.

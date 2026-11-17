@@ -28,7 +28,7 @@ Compress when the Change Log passes ~150–200 lines, or when a milestone closes
 | ID | Title | Status | Health | Last Updated | Note |
 |---|---|---|---|---|---|
 | P360-1 | Dev login (username + password) with seeded users | Done | 🟢 | 2026-11-11 | Behind `AUTH_MODE=dev`; API refuses to boot with it on Vercel production |
-| P360-2 | Google sign-in | Open | 🟡 | 2026-11-11 | Button + `POST /auth/google` stub (501) only |
+| P360-2 | Google sign-in | In Progress | 🟡 | 2026-11-17 | Built (GIS button, `POST /auth/google` verifies ID token, existing accounts only); not yet tested with a real Google sign-in, prod Client ID still to move to a nulogic.io project |
 | P360-3 | Home page (visible apps, quick links) | In Progress | 🟡 | 2026-11-11 | App cards are "Coming soon" until the apps exist |
 | P360-4 | Settings page (account, assignments, permissions) | Done | 🟢 | 2026-11-11 | Read-only |
 | P360-8 | Swagger / OpenAPI docs for the API | Done | 🟢 | 2026-11-12 | `/docs` + `/openapi.json`; `test/openapi.test.js` checks spec ↔ routes |
@@ -64,6 +64,9 @@ Compress when the Change Log passes ~150–200 lines, or when a milestone closes
 ---
 
 ## Change Log
+
+### 2026-11-17 — P360-2: Google sign-in
+Replaced the 501 stub. The login page renders Google's own button (Google Identity Services, popup); the API verifies the ID token against `GOOGLE_CLIENT_ID` (signature, audience, expiry, verified email, optional `GOOGLE_ALLOWED_DOMAINS` via the Workspace `hd` claim) and signs in only emails that already have an active account — no self-sign-up, because accounts come from invitations. The Client ID is served by `/auth/config` so it lives in one env var. The password form now only shows when `AUTH_MODE=dev`. Added `npm run set-email -w api` (dev only) to point a seeded user at a real Google address for testing. Stays 🟡 until a real Google sign-in has been tested locally; the current Client ID comes from a personal Google Cloud project and must move to a nulogic.io project before production.
 
 ### 2026-11-13 — P360-13: "Start a contribution" as a page-level CTA
 Owner asked for the button not to live only inside the Contributions tab but to be a global CTA at the top. It's now in the page header of the practice page and the group page, on every tab (`StartContributionLink`), shown to anyone with `practices.contribution.create` in the practice (client `can()`; `POST /contributions` enforces the same). Removed from the tab card. To keep one primary button per view, **New group** (Groups & members tab) and **Add member** (group Members tab) became secondary. Gated with `can()` rather than a new practice `actions.contribute` flag, so the practice detail's `actions` keep meaning "manage the structure" (PRAC-API-03 relies on that). e2e PRAC-UI-08/09/10 updated to look for the header CTA. Verified: e2e practices, contributions, invites and responsive/keyboard specs 55/55 (production build); browser on the dev stack as a practitioner (CTA on every tab, links back to the group) and as a Lead without `practices.contribution.create` (no CTA).

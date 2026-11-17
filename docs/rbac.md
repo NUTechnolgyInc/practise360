@@ -278,7 +278,9 @@ Seeded groups without a Lead: DE Mobile App, Platform Magento.
 
 Every seeded user also has a synthetic email, `<username>@example.com`, so email login and "already on Practise360?" checks work in dev.
 
-The hardcoded password must sit behind an `AUTH_MODE=dev` flag so it can't ship to production by accident; swap for SSO later without touching RBAC (auth only produces a `userId`).
+The hardcoded password must sit behind an `AUTH_MODE=dev` flag so it can't ship to production by accident (a demo deployment on seeded data may opt in with `ALLOW_DEMO_LOGIN_IN_PRODUCTION=true`, owner decision 2026-11-17); swap for SSO later without touching RBAC (auth only produces a `userId`).
+
+**Google sign-in** (`POST /auth/google`) is that SSO. The API verifies Google's ID token and looks up the user by email; it never creates accounts, so access still starts from an invitation (or the seed). With `GOOGLE_ALLOWED_DOMAINS` set, only Google Workspace accounts on those domains get in. RBAC is unchanged: Google only resolves a `userId`.
 
 ## 8. Open questions
 
