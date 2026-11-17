@@ -134,6 +134,33 @@ schemas.PracticeInvite = {
     actions: { type: "object", properties: { cancel: { type: "boolean" }, resend: { type: "boolean" } } },
   },
 };
+const BulkInviteResult = {
+  allOf: [
+    ref("PracticeDetail"),
+    {
+      type: "object",
+      properties: {
+        results: {
+          type: "array",
+          items: {
+            type: "object",
+            required: ["email", "status"],
+            properties: {
+              email: { type: "string" },
+              status: { type: "string", enum: ["invited", "added", "member", "refused"] },
+              reason: { type: "string", description: "`member` and `refused`: why nothing was sent" },
+              name: { type: "string", description: "Display name, when the address belongs to an account" },
+              inviteId: { type: "string", description: "`invited` only" },
+              delivery: { type: "string", enum: ["sent", "logged", "failed"], description: "`invited` only" },
+              acceptUrl: { type: "string", description: "`invited` only, with AUTH_MODE=dev and no SMTP_URL" },
+            },
+          },
+        },
+      },
+    },
+  ],
+};
+
 const InviteResult = {
   allOf: [
     ref("PracticeDetail"),
@@ -334,6 +361,20 @@ const paths = {
           { email: "new.person@example.com", kind: "lead", groupId: "digital-engineering-mobile-app" },
         ),
         responses: { 201: json("The practice, plus how the email went", InviteResult), 400: err("Validation failed"), 409: err("That email already has an account"), ...COMMON, ...NOT_FOUND },
+      },
+    ),
+  },
+  "/practices/{id}/invites/bulk": {
+    parameters: [ID],
+    post: op(
+      "Add or invite several people by email",
+      "Members only (as Practitioner), optionally all into `groupId` — that needs `practices.members.manage`. Up to 50 distinct addresses per call; `emails` is an array or a comma/semicolon/space-separated string. Refused with 403 when the caller couldn't add a member here at all. Otherwise every address gets the same checks as a single invite (valid, `INVITE_EMAIL_DOMAINS`, escalation guard) and its own result: `invited` (emailed a link — replaces an open invitation for that email here), `added` (already has an account, so added directly), `member` (already in the practice — nothing changes) or `refused` (with `reason`).",
+      {
+        requestBody: body(
+          { type: "object", required: ["emails"], properties: { emails: { oneOf: [{ type: "array", items: { type: "string" }, maxItems: 50 }, { type: "string" }] }, groupId: { type: "string" } } },
+          { emails: ["new.person@example.com", "another.person@example.com"], groupId: "digital-engineering-fullstack" },
+        ),
+        responses: { 200: json("The practice, plus one result per address", BulkInviteResult), 400: err("No addresses, more than 50, or an unknown group"), ...COMMON, ...NOT_FOUND },
       },
     ),
   },

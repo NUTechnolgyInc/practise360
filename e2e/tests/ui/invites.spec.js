@@ -18,7 +18,7 @@ test("[INV-UI-01] Manager invites a new member by email; they join from the link
   await loginAs("de.manager");
   await page.goto("/practices/digital-engineering?tab=groups");
   await page.getByRole("button", { name: "Add member" }).click();
-  const dialog = page.getByRole("dialog", { name: "Add someone to Digital Engineering" });
+  const dialog = page.getByRole("dialog", { name: "Add people to Digital Engineering" });
   await dialog.getByRole("searchbox").fill(email);
   await dialog.getByRole("radio", { name: `Invite ${email}` }).check();
   await dialog.getByLabel("Group").selectOption({ label: "Mobile App" });

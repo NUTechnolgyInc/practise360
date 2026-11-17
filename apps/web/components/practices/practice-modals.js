@@ -8,7 +8,7 @@ import { api } from "@/lib/api";
 import { AddMemberModal } from "./add-member-modal";
 import { ChooseHolderModal } from "./choose-holder-modal";
 import { GroupFormModal } from "./group-form-modal";
-import { announceInvite, InviteSentModal } from "./invite-sent-modal";
+import { announceBulkInvite, announceInvite, BulkInviteResultsModal, InviteSentModal } from "./invite-sent-modal";
 import { RenamePracticeModal } from "./rename-practice-modal";
 
 const ROLE_OF_INVITE = { manager: "Manager", lead: "Lead" };
@@ -16,20 +16,22 @@ const ROLE_OF_INVITE = { manager: "Manager", lead: "Lead" };
 /**
  * Every dialog on the practice page. `modal` = { type: "edit" | "manager" | "lead" | "group" | "add" | "delete" |
  * "removeLead", group? } or null. Each mutation returns the updated practice, handed to `onChanged`; one that sent an
- * invitation also carries `invite`, announced here (a toast, or the join link when email isn't set up).
+ * invitation also carries `invite` (or `results`, from a bulk add by email), announced here (a toast, or the join link when email isn't set up).
  */
 export function PracticeModals({ practice, modal, onClose, onChanged }) {
   const toast = useToast();
   const [sentInvite, setSentInvite] = useState(null);
+  const [bulkResults, setBulkResults] = useState(null);
   const people = useResource(modal?.type === "manager" ? "/practices/people" : null);
   const { id, actions, groups } = practice;
   const members = practice.members ?? [];
   const invites = practice.invites ?? [];
   const group = modal?.group ?? null;
   const groupName = new Map(groups.map((g) => [g.id, g.name]));
-  const saved = ({ invite, ...updated }) => {
+  const saved = ({ invite, results, ...updated }) => {
     onChanged(updated);
     onClose();
+    announceBulkInvite(results, { toast, show: setBulkResults, where: practice.name });
     if (invite) {
       const kind = updated.invites?.find((i) => i.id === invite.id)?.kind;
       announceInvite(invite, { toast, show: setSentInvite, role: ROLE_OF_INVITE[kind] });
@@ -94,6 +96,7 @@ export function PracticeModals({ practice, modal, onClose, onChanged }) {
       />
       <AddMemberModal open={modal?.type === "add"} practice={practice} canPlace={actions.moveMembers} onClose={onClose} onSaved={saved} />
       <InviteSentModal invite={sentInvite} onClose={() => setSentInvite(null)} />
+      <BulkInviteResultsModal results={bulkResults} onClose={() => setBulkResults(null)} />
       <ConfirmModal
         open={modal?.type === "delete"}
         onClose={onClose}

@@ -7,7 +7,7 @@ import { ConfirmModal } from "@/components/certs/confirm-modal";
 import { PersonChip } from "@/components/people/person-link";
 import { api } from "@/lib/api";
 import { AddToGroupModal } from "./add-to-group-modal";
-import { announceInvite, InviteSentModal } from "./invite-sent-modal";
+import { announceBulkInvite, announceInvite, BulkInviteResultsModal, InviteSentModal } from "./invite-sent-modal";
 
 /**
  * Members tab of a group page. With `group.actions.manageMembers` (its Lead, the Manager, Practices Admin) people can
@@ -19,14 +19,16 @@ export function GroupMembersTab({ practice, group, onChanged }) {
   const [adding, setAdding] = useState(false);
   const [removing, setRemoving] = useState(null);
   const [sentInvite, setSentInvite] = useState(null);
+  const [bulkResults, setBulkResults] = useState(null);
   const canManage = group.actions.manageMembers;
   const groupName = new Map(practice.groups.map((g) => [g.id, g.name]));
   const members = (practice.members ?? []).filter((m) => m.groupId === group.id);
 
-  const added = ({ invite, ...updated }) => {
+  const added = ({ invite, results, ...updated }) => {
     onChanged(updated);
     setAdding(false);
     announceInvite(invite, { toast, show: setSentInvite });
+    announceBulkInvite(results, { toast, show: setBulkResults, where: group.name });
   };
 
   const remove = async () => {
@@ -96,6 +98,7 @@ export function GroupMembersTab({ practice, group, onChanged }) {
 
       <AddToGroupModal open={adding} practice={practice} group={group} onClose={() => setAdding(false)} onSaved={added} />
       <InviteSentModal invite={sentInvite} onClose={() => setSentInvite(null)} />
+      <BulkInviteResultsModal results={bulkResults} onClose={() => setBulkResults(null)} />
       <ConfirmModal
         open={!!removing}
         onClose={() => setRemoving(null)}

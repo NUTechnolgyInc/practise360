@@ -115,3 +115,60 @@ test("an invitation expires at its expiry time", () => {
   assert.ok(!inv.isExpired({ expiresAt: new Date(now + 1000) }, now));
   assert.ok(inv.isExpired({ expiresAt: new Date(now) }, now));
 });
+
+test("a bulk list is split on commas, semicolons and whitespace, normalised and de-duplicated in order", () => {
+  assert.deepEqual(inv.parseEmailList(" Ana@Example.com, ben@example.com;ana@example.com\n\ncara@example.com ,, "), ["ana@example.com", "ben@example.com", "cara@example.com"]);
+  assert.deepEqual(inv.parseEmailList(["B@example.com", "b@example.com", "", "not-an-email"]), ["b@example.com", "not-an-email"]);
+  assert.deepEqual(inv.parseEmailList(undefined), []);
+  assert.deepEqual(inv.parseEmailList({ emails: "x@example.com" }), []);
+});
+
+test("a bulk invite decides each address on its own: invite, add directly, already a member, or refused", () => {
+  const plan = (actor, emails, opts = {}) =>
+    inv.planBulkInvite(emails, { actor, practiceId: DE, practiceName: "Digital Engineering", roles, tree: TREE, ...opts });
+  const accounts = new Map([
+    ["dana@example.com", { _id: "u-dana", displayName: "Dana Demo", isActive: true }],
+    ["eli@example.com", { _id: "u-eli", displayName: "Eli Example", isActive: true }],
+    ["gone@example.com", { _id: "u-gone", displayName: "Gone User", isActive: false }],
+  ]);
+  const memberIds = new Set(["u-eli"]);
+  const result = plan(deManager, ["new@example.com", "dana@example.com", "eli@example.com", "gone@example.com", "nope"], { accounts, memberIds });
+  assert.deepEqual(result.map((r) => [r.email, r.action]), [
+    ["new@example.com", "invite"],
+    ["dana@example.com", "add"],
+    ["eli@example.com", "member"],
+    ["gone@example.com", "refused"],
+    ["nope", "refused"],
+  ]);
+  assert.match(result[2].reason, /Eli Example is already in Digital Engineering/);
+  assert.match(result[3].reason, /deactivated/);
+  assert.match(result[4].reason, /valid email/);
+});
+
+test("a bulk invite runs the escalation guard for every address — one the caller couldn't add directly is refused", () => {
+  const plan = (actor, opts = {}) => inv.planBulkInvite(["a@example.com", "b@example.com"], { actor, practiceId: DE, roles, tree: TREE, ...opts });
+  // A Lead can't bring people into the practice, even ones who already have accounts.
+  const accounts = new Map([["b@example.com", { _id: "u-b", displayName: "Bea", isActive: true }]]);
+  for (const r of plan(deLead, { accounts })) assert.equal(r.action, "refused", r.email);
+  // A Manager can't add into another practice.
+  for (const r of inv.planBulkInvite(["a@example.com"], { actor: deManager, practiceId: "qa", roles, tree: TREE })) assert.equal(r.action, "refused");
+  // Into a group needs practices.members.manage too.
+  const assignOnly = { id: "u2", grants: [{ scopeType: "practice", scopeId: DE, permissions: [...roles.practitioner.permissions, "practices.roles.assign"] }] };
+  assert.deepEqual(plan(assignOnly).map((r) => r.action), ["invite", "invite"]);
+  for (const r of plan(assignOnly, { groupId: FULLSTACK })) assert.match(r.reason, /practices\.members\.manage/);
+  assert.deepEqual(plan(practicesAdmin, { groupId: FULLSTACK }).map((r) => r.action), ["invite", "invite"]);
+});
+
+test("a bulk invite respects INVITE_EMAIL_DOMAINS per address", () => {
+  const before = process.env.INVITE_EMAIL_DOMAINS;
+  try {
+    process.env.INVITE_EMAIL_DOMAINS = "example.com";
+    const result = inv.planBulkInvite(["ok@example.com", "out@elsewhere.org"], { actor: deManager, practiceId: DE, roles, tree: TREE });
+    assert.equal(result[0].action, "invite");
+    assert.equal(result[1].action, "refused");
+    assert.match(result[1].reason, /Only example\.com addresses/);
+  } finally {
+    if (before === undefined) delete process.env.INVITE_EMAIL_DOMAINS;
+    else process.env.INVITE_EMAIL_DOMAINS = before;
+  }
+});

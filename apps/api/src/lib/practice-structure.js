@@ -123,6 +123,15 @@ async function replaceHolder({ user: actor, tree }, role, scope, userId, { keepP
   return null;
 }
 
+/**
+ * Adds someone to a practice as a Practitioner, optionally straight into a group. The caller has already run the
+ * guard (checkGrant for Practitioner, canMoveMember for the group) — shared by "Add member" and bulk invites.
+ */
+async function addPracticeMember(practiceId, userId, groupId, actorId) {
+  await RoleAssignment.create({ userId, roleId: "practitioner", scopeType: "practice", scopeId: practiceId, grantedBy: actorId });
+  if (groupId) await GroupMembership.updateOne({ practiceId, userId }, { groupId, addedBy: actorId, addedAt: new Date() }, { upsert: true });
+}
+
 /** Lower-case, dash-separated slug for practice and group ids. */
 const slugify = (name, fallback) =>
   String(name)
@@ -153,6 +162,7 @@ module.exports = {
   afterRevoke,
   structureRoles,
   replaceHolder,
+  addPracticeMember,
   slugify,
   uniqueId,
 };

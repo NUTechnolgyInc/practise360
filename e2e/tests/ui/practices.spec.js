@@ -218,7 +218,7 @@ test.describe("Practice and group Contributions, group page", () => {
       await page.goto(`${FULLSTACK_PAGE}?tab=members`);
       const members = card(page, "Members");
       await members.getByRole("button", { name: "Add member" }).click();
-      const dialog = page.getByRole("dialog", { name: "Add someone to Fullstack" });
+      const dialog = page.getByRole("dialog", { name: "Add people to Fullstack" });
       const jesse = dialog.getByRole("radio", { name: /Jesse Monroe· not in a group/ });
       await expect(jesse).toBeVisible();
       await expect(dialog.getByRole("radio", { name: /Blair Kim/ })).toHaveCount(0); // in DevOps: another Lead's group

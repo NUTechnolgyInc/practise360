@@ -300,8 +300,7 @@ router.post(
       if (!req.tree.groups.some((g) => g._id === groupId && g.practiceId === req.practice._id)) return bad(res, "Unknown group");
       if (!canMoveMember(req.user, req.practice._id, null, groupId, req.tree)) return bad(res, `Missing permission ${PERM.MEMBERS_MANAGE}`, 403);
     }
-    await RoleAssignment.create({ userId: target._id, roleId: "practitioner", scopeType: "practice", scopeId: req.practice._id, grantedBy: req.user.id });
-    if (groupId) await GroupMembership.updateOne({ practiceId: req.practice._id, userId: target._id }, { groupId, addedBy: req.user.id, addedAt: new Date() }, { upsert: true });
+    await structure.addPracticeMember(req.practice._id, target._id, groupId, req.user.id);
     await respond(req, res, 201);
   }),
 );

@@ -7,7 +7,7 @@ const { can } = require("../rbac/engine");
 const { isDevAuth } = require("../middleware/auth");
 const { mailConfigured } = require("../lib/mailer");
 const { bad, wrap, usersById, person } = require("../lib/http");
-const { isPracticeMember, structureRoles } = require("../lib/practice-structure");
+const { addPracticeMember, isPracticeMember, structureRoles } = require("../lib/practice-structure");
 const inv = require("../lib/invites");
 
 /** Who sees a practice's open invitations: people who could send one (they hold practices.roles.assign there). */
@@ -51,6 +51,28 @@ async function alreadyOnPractise360(user, email, kind, practice) {
  */
 const linkForInviter = (token) => (isDevAuth() && !mailConfigured() ? { acceptUrl: inv.acceptUrl(token) } : {});
 
+/**
+ * Creates and emails one invitation, replacing any open one for the same person here (and, for Manager/Lead, for the
+ * same slot). The caller has already run the guard. Returns { created, token, delivery }.
+ */
+async function issueInvite(req, invite) {
+  const { practiceId, email, kind, groupId } = invite;
+  await inv.cancelPending({ practiceId, email }, req.user.id, "Replaced by a newer invitation");
+  if (kind === "manager") await inv.cancelPending({ practiceId, kind }, req.user.id, "Someone else was invited as Manager");
+  if (kind === "lead") await inv.cancelPending({ practiceId, kind, groupId }, req.user.id, "Someone else was invited as Lead");
+  const { token, tokenHash } = inv.newToken();
+  const created = await Invitation.create({ ...invite, tokenHash, invitedBy: req.user.id, expiresAt: new Date(Date.now() + inv.INVITE_TTL_MS) });
+  const delivery = await inv.deliver(created, token, req.user.displayName, req.tree);
+  return { created, token, delivery };
+}
+
+/** Runs `fn` over `items` a few at a time: SMTP is slow, but dozens of parallel connections would trip rate limits. */
+async function inBatches(items, size, fn) {
+  const out = [];
+  for (let i = 0; i < items.length; i += size) out.push(...(await Promise.all(items.slice(i, i + size).map(fn))));
+  return out;
+}
+
 function inviteRoutes(router, { load, detail }) {
   const loadInvite = wrap(async (req, res, next) => {
     const { inviteId } = req.params;
@@ -87,14 +109,57 @@ function inviteRoutes(router, { load, detail }) {
       const existing = await User.findOne({ email }, "displayName isActive").lean();
       if (existing) return bad(res, await alreadyOnPractise360(existing, email, kind, req.practice), 409);
 
-      await inv.cancelPending({ practiceId, email }, req.user.id, "Replaced by a newer invitation");
-      if (kind === "manager") await inv.cancelPending({ practiceId, kind }, req.user.id, "Someone else was invited as Manager");
-      if (kind === "lead") await inv.cancelPending({ practiceId, kind, groupId }, req.user.id, "Someone else was invited as Lead");
-
-      const { token, tokenHash } = inv.newToken();
-      const created = await Invitation.create({ ...invite, tokenHash, invitedBy: req.user.id, expiresAt: new Date(Date.now() + inv.INVITE_TTL_MS) });
-      const delivery = await inv.deliver(created, token, req.user.displayName, req.tree);
+      const { created, token, delivery } = await issueInvite(req, invite);
       await reply(req, res, 201, created, token, delivery);
+    }),
+  );
+
+  /**
+   * Bulk "add by email" as members (optionally into one group). Every address gets the single invite's checks; someone
+   * already on Practise360 is added directly (the same appointment), someone already here is reported, not changed.
+   * Replies with the updated practice plus `results`, one per distinct address, in the order given.
+   */
+  router.post(
+    "/:id/invites/bulk",
+    load,
+    wrap(async (req, res) => {
+      const b = req.body || {};
+      const practiceId = req.practice._id;
+      const emails = inv.parseEmailList(b.emails);
+      if (!emails.length) return bad(res, "Enter at least one email address");
+      if (emails.length > inv.BULK_INVITE_MAX) return bad(res, `Invite at most ${inv.BULK_INVITE_MAX} people at a time`);
+      const groupId = b.groupId || null;
+      if (groupId && !req.tree.groups.some((g) => g._id === groupId && g.practiceId === practiceId)) return bad(res, "Unknown group");
+
+      const roles = await structureRoles();
+      // Refuse callers who can't add anyone here before saying which addresses already have accounts.
+      const refusal = inv.inviteRefusal(req.user, { kind: "member", practiceId, groupId }, roles, req.tree);
+      if (refusal) return bad(res, refusal, 403);
+
+      const users = await User.find({ email: { $in: emails.filter(inv.isEmail) } }, "displayName email isActive").lean();
+      const accounts = new Map(users.map((u) => [u.email.toLowerCase(), u]));
+      const memberIds = new Set();
+      await Promise.all(users.map(async (u) => (await isPracticeMember(u._id, practiceId)) && memberIds.add(String(u._id))));
+      const plan = inv.planBulkInvite(emails, { actor: req.user, practiceId, practiceName: req.practice.name, groupId, roles, tree: req.tree, accounts, memberIds });
+
+      const results = await inBatches(plan, 5, async ({ email, action, reason, user }) => {
+        const name = user?.displayName;
+        try {
+          if (action === "add") {
+            await addPracticeMember(practiceId, user._id, groupId, req.user.id);
+            return { email, status: "added", name };
+          }
+          if (action === "invite") {
+            const { created, token, delivery } = await issueInvite(req, { email, kind: "member", practiceId, groupId, keepPrevious: true });
+            return { email, status: "invited", inviteId: String(created._id), delivery: delivery.status, ...linkForInviter(token) };
+          }
+          return { email, status: action === "member" ? "member" : "refused", reason, ...(name && { name }) };
+        } catch (err) {
+          console.error(`[invites] bulk ${action} for ${email} failed:`, err.message);
+          return { email, status: "refused", reason: "Something went wrong — try this one again" };
+        }
+      });
+      res.json({ ...(await detail(req)), results });
     }),
   );
 

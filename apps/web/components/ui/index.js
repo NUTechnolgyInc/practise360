@@ -12,3 +12,4 @@ export { EmptyState, NoAccess } from "./empty-state";
 export { Modal } from "./modal";
 export { ToastProvider, useToast } from "./toast";
 export { Markdown } from "./markdown";
+export { EmailChip, EmailChipsInput, isEmailAddress, splitEmails } from "./email-chips";

@@ -100,6 +100,41 @@ async function deliver(invite, token, inviterName, tree) {
   return delivery;
 }
 
+/** Most addresses one bulk invite takes — keeps a request (and its emails) inside a serverless function's time limit. */
+const BULK_INVITE_MAX = 50;
+
+/**
+ * A list of addresses from an array or a "a@x, b@x; c@x" string: trimmed, lower-cased, blanks and repeats dropped,
+ * order kept. Doesn't validate — invalid ones come back so the caller can say which.
+ */
+function parseEmailList(input) {
+  const parts = Array.isArray(input) ? input : typeof input === "string" ? input.split(/[,;\s]+/) : [];
+  return [...new Set(parts.map(normalizeEmail).filter(Boolean))];
+}
+
+/**
+ * What a bulk member invite does with each address (rbac.md §4 "Invitations"), decided without the DB so it can be
+ * tested. Each address gets the same checks as a single invite or a direct add: valid, an allowed domain, and the
+ * escalation guard (which doesn't depend on the address, but is asked per address so no path skips it).
+ * `accounts` = Map(email → { _id, displayName, isActive }); `memberIds` = Set of user ids already in the practice.
+ * Returns [{ email, action: "invite" | "add" | "member" | "refused", reason?, user? }] in input order.
+ */
+function planBulkInvite(emails, { actor, practiceId, practiceName, groupId = null, roles, tree, accounts = new Map(), memberIds = new Set() }) {
+  return emails.map((email) => {
+    if (!isEmail(email)) return { email, action: "refused", reason: "Not a valid email address" };
+    if (!domainAllowed(email)) return { email, action: "refused", reason: `Only ${allowedDomains().join(", ")} addresses can be invited` };
+    const refusal = inviteRefusal(actor, { email, kind: "member", practiceId, groupId }, roles, tree);
+    if (refusal) return { email, action: "refused", reason: refusal };
+    const user = accounts.get(email);
+    if (!user) return { email, action: "invite" };
+    if (!user.isActive) return { email, action: "refused", reason: "Belongs to a deactivated account", user };
+    if (memberIds.has(String(user._id))) return { email, action: "member", reason: `${user.displayName} is already in ${practiceName ?? "this practice"}`, user };
+    // Already on Practise360: an invitation would only be refused ("pick them instead"), so add them directly — the same
+    // appointment, checked by the same guard above.
+    return { email, action: "add", user };
+  });
+}
+
 /** Cancels every pending invitation matching `filter` (e.g. the Manager slot was filled another way). */
 const cancelPending = (filter, actorId, reason) =>
   Invitation.updateMany({ ...filter, status: "pending" }, { status: "cancelled", cancelledBy: actorId, cancelledAt: new Date(), cancelReason: reason });
@@ -121,4 +156,7 @@ module.exports = {
   isExpired,
   deliver,
   cancelPending,
+  BULK_INVITE_MAX,
+  parseEmailList,
+  planBulkInvite,
 };

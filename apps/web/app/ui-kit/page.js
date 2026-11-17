@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Award, Cpu, LayoutGrid, Plus, Send, Users } from "lucide-react";
 import { AppShell, HeroBanner, PageHeader } from "@/components/layout";
 import {
-  Avatar, Badge, Button, Card, CardFooter, CardHeader, EmptyState, Field, Input, Markdown, Modal, NoAccess, Progress,
+  Avatar, Badge, Button, Card, CardFooter, CardHeader, EmailChip, EmailChipsInput, EmptyState, Field, Input, Markdown, Modal, NoAccess, Progress,
   Select, StatsToggle, StatTile, StatusBadge, Table, TBody, TD, TH, THead, TR, Tabs, Textarea, UserChip, useToast,
 } from "@/components/ui";
 
@@ -47,6 +47,7 @@ export default function UiKitPage() {
   const [tab, setTab] = useState("buttons");
   const [modalOpen, setModalOpen] = useState(false);
   const [statsShown, setStatsShown] = useState(true);
+  const [emails, setEmails] = useState(["sam.sample@example.com", "riley.test@example.com", "not-an-email"]);
   const toast = useToast();
 
   return (
@@ -114,6 +115,15 @@ export default function UiKitPage() {
               <Button onClick={() => setModalOpen(true)}>Open modal</Button>
               <Button variant="secondary" onClick={() => toast("Saved")}>Success toast</Button>
               <Button variant="secondary" onClick={() => toast("Something failed", "error")}>Error toast</Button>
+            </div>
+          </Section>
+          <Section title="Email chips (bulk invite)">
+            <Field id="kit-emails" label="Emails" hint="Comma, Enter, leaving the field or pasting a list makes chips. Backspace in the empty field removes the last one.">
+              {(p) => <EmailChipsInput {...p} value={emails} onChange={setEmails} max={50} />}
+            </Field>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <EmailChip email="jordan.fake@example.com" />
+              <EmailChip email="casey@" error="Not a valid email address" />
             </div>
           </Section>
           <Card interactive>
