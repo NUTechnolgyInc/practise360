@@ -28,7 +28,7 @@ Compress when the Change Log passes ~150–200 lines, or when a milestone closes
 | ID | Title | Status | Health | Last Updated | Note |
 |---|---|---|---|---|---|
 | P360-1 | Dev login (username + password) with seeded users | Done | 🟢 | 2026-11-11 | Behind `AUTH_MODE=dev`; API refuses to boot with it on Vercel production |
-| P360-2 | Google sign-in | In Progress | 🟡 | 2026-11-17 | Built (GIS button, `POST /auth/google` verifies ID token, existing accounts only); not yet tested with a real Google sign-in, prod Client ID still to move to a nulogic.io project |
+| P360-2 | Google sign-in | In Progress | 🟡 | 2026-11-17 | Built (GIS button, `POST /auth/google` verifies ID token, first sign-in creates a no-role account); not yet tested with a real Google sign-in, prod Client ID still to move to a nulogic.io project |
 | P360-3 | Home page (visible apps, quick links) | In Progress | 🟡 | 2026-11-11 | App cards are "Coming soon" until the apps exist |
 | P360-4 | Settings page (account, assignments, permissions) | Done | 🟢 | 2026-11-11 | Read-only |
 | P360-8 | Swagger / OpenAPI docs for the API | Done | 🟢 | 2026-11-12 | `/docs` + `/openapi.json`; `test/openapi.test.js` checks spec ↔ routes |
@@ -64,6 +64,9 @@ Compress when the Change Log passes ~150–200 lines, or when a milestone closes
 ---
 
 ## Change Log
+
+### 2026-11-17 — P360-2: Google sign-in creates the account
+Owner decision: turning away Google users without an account blocked people who just hadn't been invited yet. The first Google sign-in now creates the account with no roles — it opens no app, and the home page says to ask the Practice Manager to be added. Invitations and Google share one find-or-create-by-email helper, so a later invitation to that email reuses the account. With `GOOGLE_ALLOWED_DOMAINS` unset (the demo), any verified Google account can create one; set it to `nulogic.io` for real use.
 
 ### 2026-11-17 — Demo deployment on Vercel
 Deployed `practise360-web` (https://practise360-web.vercel.app) and `practise360-api` (https://practise360-api.vercel.app) to Vercel team rlal-nu1, on MongoDB Atlas seeded with the demo data, so the app can be shown without a local setup. Demo passwords stay on through the new `ALLOW_DEMO_LOGIN_IN_PRODUCTION` opt-in (owner decision) — the production guard still blocks `AUTH_MODE=dev` without it. Projects deploy from the CLI because rlal-nu1 can't reach the GitHub repo; Node 24 because Vercel retired 20. Steps in `docs/runbooks/deployment.md`.

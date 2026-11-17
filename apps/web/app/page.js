@@ -23,13 +23,18 @@ function Home() {
   return (
     <>
       <HeroBanner eyebrow="Practise360" title={`Welcome, ${me.displayName.split(" ")[0]}`}>
-        You can see {me.apps.length} {me.apps.length === 1 ? "app" : "apps"} based on your role assignments.
+        {me.apps.length === 0
+          ? "You're signed in. You're not part of a practice yet, so there's nothing to open here for now."
+          : `You can see ${me.apps.length} ${me.apps.length === 1 ? "app" : "apps"} based on your role assignments.`}
       </HeroBanner>
 
       <Card>
         <CardHeader title="Your apps" description="Apps open up as they're built — access already follows your roles." />
         {me.apps.length === 0 ? (
-          <EmptyState title="No apps yet" description="You don't hold any role that opens an app. Ask your Practice Manager." />
+          <EmptyState
+            title="No apps yet"
+            description="Ask your Practice Manager to add you to their practice. Your apps show up here the next time you open Practise360 — no need to sign in again."
+          />
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {me.apps.map((app) => {

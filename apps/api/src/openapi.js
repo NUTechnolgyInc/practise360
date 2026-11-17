@@ -310,13 +310,17 @@ function buildSpec({ serverUrl } = {}) {
           tags: ["Auth"],
           summary: "Sign in with Google",
           description:
-            "Exchanges a Google ID token (the `credential` Google Identity Services gives the browser) for a session. The token must be issued for this API's `GOOGLE_CLIENT_ID`, the email verified and, when `GOOGLE_ALLOWED_DOMAINS` is set, a Workspace account on one of those domains. Only emails that already have an active account sign in — there is no self-sign-up.",
+            "Exchanges a Google ID token (the `credential` Google Identity Services gives the browser) for a session. The token must be issued for this API's `GOOGLE_CLIENT_ID`, the email verified and, when `GOOGLE_ALLOWED_DOMAINS` is set, a Workspace account on one of those domains. The first sign-in creates the account with no roles (it opens no app until someone grants one); a deactivated account is refused.",
           requestBody: body({ type: "object", required: ["credential"], properties: { credential: { type: "string", description: "Google ID token (JWT)" } } }),
           responses: {
-            200: json("Signed in", ref("Token")),
+            200: json("Signed in", {
+              type: "object",
+              required: ["token", "created"],
+              properties: { token: { type: "string", description: "JWT, valid 8h" }, created: { type: "boolean", description: "True when this sign-in created the account" } },
+            }),
             400: err("Credential missing"),
             401: err("Invalid Google token, unverified email, or a domain that isn't allowed"),
-            403: err("No account for this email, or the account is deactivated"),
+            403: err("The account is deactivated"),
             501: err("Google sign-in isn't configured on this API"),
           },
         },

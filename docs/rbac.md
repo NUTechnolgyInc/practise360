@@ -280,7 +280,7 @@ Every seeded user also has a synthetic email, `<username>@example.com`, so email
 
 The hardcoded password must sit behind an `AUTH_MODE=dev` flag so it can't ship to production by accident (a demo deployment on seeded data may opt in with `ALLOW_DEMO_LOGIN_IN_PRODUCTION=true`, owner decision 2026-11-17); swap for SSO later without touching RBAC (auth only produces a `userId`).
 
-**Google sign-in** (`POST /auth/google`) is that SSO. The API verifies Google's ID token and looks up the user by email; it never creates accounts, so access still starts from an invitation (or the seed). With `GOOGLE_ALLOWED_DOMAINS` set, only Google Workspace accounts on those domains get in. RBAC is unchanged: Google only resolves a `userId`.
+**Google sign-in** (`POST /auth/google`) is that SSO. The API verifies Google's ID token and looks up the user by email. **The first Google sign-in creates the account** (owner decision 2026-11-17) with **no role assignments**, so it sees no app — the home page tells them to ask their Practice Manager to add them. Access still only comes from a grant or an invitation; an invitation sent to that email later reuses the same account. With `GOOGLE_ALLOWED_DOMAINS` set, only Google Workspace accounts on those domains get in. RBAC is unchanged: Google only resolves a `userId`.
 
 ## 8. Open questions
 

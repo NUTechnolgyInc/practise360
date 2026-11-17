@@ -9,6 +9,7 @@ const { signToken } = require("../middleware/auth");
 const { bad, wrap, str } = require("../lib/http");
 const structure = require("../lib/practice-structure");
 const inv = require("../lib/invites");
+const { findOrCreateByEmail } = require("../lib/accounts");
 
 const router = express.Router();
 
@@ -60,19 +61,6 @@ router.get(
   }),
 );
 
-/** Find or create the account for the invited email. A concurrent accept may create it first — then use theirs. */
-async function accountFor(invite, displayName) {
-  const existing = await User.findOne({ email: invite.email }).lean();
-  if (existing) return existing;
-  const username = await structure.uniqueId(inv.usernameBase(invite.email), async (x) => !!(await User.exists({ username: x })));
-  try {
-    return (await User.create({ username, displayName: displayName || inv.displayNameFromEmail(invite.email), email: invite.email })).toObject();
-  } catch (err) {
-    if (err.code === 11000) return User.findOne({ email: invite.email }).lean();
-    throw err;
-  }
-}
-
 router.post(
   "/:token/accept",
   wrap(async (req, res) => {
@@ -82,7 +70,7 @@ router.post(
     if (account && !account.isActive) return bad(res, "Your Practise360 account is deactivated. Ask an admin to restore it.", 403);
     const displayName = str(req.body?.displayName, 80, "Name");
 
-    const user = account ?? (await accountFor(invite, displayName));
+    const user = account ?? (await findOrCreateByEmail(invite.email, displayName)).user;
     const userId = String(user._id);
     const { practiceId, groupId } = invite;
     const actor = { user: inviter, tree };

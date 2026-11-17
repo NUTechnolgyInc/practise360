@@ -60,7 +60,7 @@ scripts/tracker/           Tracker parser + local Kanban board
 - **Enforce on the API**, always. The web app uses the same data only to hide/show UI — never as the security boundary.
 
 ### Auth
-Google sign-in (`POST /auth/google`, `GOOGLE_CLIENT_ID`) for existing accounts only. Dev stop-gap alongside it: username + password, password hardcoded to `password` for every seeded user. This must stay behind `AUTH_MODE=dev` and never ship to production — the one exception is the demo deployment on seeded data, which opts in with `ALLOW_DEMO_LOGIN_IN_PRODUCTION=true` (owner decision 2026-11-17). Auth only produces a `userId`; RBAC must not depend on how login works, so SSO can replace it later.
+Google sign-in (`POST /auth/google`, `GOOGLE_CLIENT_ID`); the first sign-in creates an account with no roles. Dev stop-gap alongside it: username + password, password hardcoded to `password` for every seeded user. This must stay behind `AUTH_MODE=dev` and never ship to production — the one exception is the demo deployment on seeded data, which opts in with `ALLOW_DEMO_LOGIN_IN_PRODUCTION=true` (owner decision 2026-11-17). Auth only produces a `userId`; RBAC must not depend on how login works, so SSO can replace it later.
 
 ---
 

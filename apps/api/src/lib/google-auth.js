@@ -24,7 +24,7 @@ function identityFromClaims(claims, domains = allowedDomains()) {
     const hd = String(claims.hd || "").toLowerCase();
     if (!domains.includes(hd)) return { error: `Sign in with your ${domains.join(" or ")} Google account` };
   }
-  return { email, name: claims.name || email };
+  return { email, name: claims.name || null };
 }
 
 let client;

@@ -3,6 +3,7 @@ const { connectDb } = require("../db");
 const { Role, RoleAssignment, User } = require("../models");
 const { signToken, isDevAuth } = require("../middleware/auth");
 const { clientId, isGoogleEnabled, verifyGoogleCredential } = require("../lib/google-auth");
+const { findOrCreateByEmail } = require("../lib/accounts");
 
 const router = express.Router();
 const DEV_PASSWORD = "password";
@@ -50,7 +51,7 @@ router.post("/login", async (req, res, next) => {
   }
 });
 
-/** Exchanges a Google ID token for a Practise360 session. Only people who already have an account get in. */
+/** Exchanges a Google ID token for a Practise360 session, creating the account on first sign-in. */
 router.post("/google", async (req, res, next) => {
   try {
     if (!isGoogleEnabled()) return res.status(501).json({ error: "Google sign-in is not available yet" });
@@ -61,12 +62,12 @@ router.post("/google", async (req, res, next) => {
     if (identity.error) return res.status(401).json({ error: identity.error });
 
     await connectDb();
-    const user = await User.findOne({ email: identity.email }).lean();
-    // No self-sign-up: accounts come from invitations (docs/rbac.md §4), so access always starts from someone who can grant it.
-    if (!user) return res.status(403).json({ error: `There's no Practise360 account for ${identity.email}. Ask your Practice Manager to invite you.` });
+    // First Google sign-in creates the account with no roles (owner decision 2026-11-17, docs/rbac.md "Auth"):
+    // it opens no app until someone grants a role, and the home page tells them so.
+    const { user, created } = await findOrCreateByEmail(identity.email, identity.name);
     if (!user.isActive) return res.status(403).json({ error: "This account is deactivated" });
 
-    res.json({ token: signToken(user._id) });
+    res.json({ token: signToken(user._id), created });
   } catch (err) {
     next(err);
   }
