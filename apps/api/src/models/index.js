@@ -10,6 +10,8 @@ const userSchema = new Schema(
     displayName: { type: String, required: true },
     email: { type: String, lowercase: true, trim: true },
     isActive: { type: Boolean, default: true },
+    // Real people on the demo deployment: Google sign-in only, so the shared demo password can't open their account.
+    googleOnly: { type: Boolean, default: false },
   },
   { timestamps: true },
 );

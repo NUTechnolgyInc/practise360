@@ -32,7 +32,7 @@ export function PortalShell({ breadcrumbs, requires, children }) {
     { href: "/", label: "Home", icon: Home },
     ...(canAnywhere(me, "practices.practice.view", "practices.contribution.view") ? [{ href: practicesHome(me), label: "Practices", icon: Lightbulb }] : []),
     ...(me.apps.some((a) => a.id === "cert-tracker") ? [{ href: "/certifications", label: "Certifications", icon: Award }] : []),
-    ...(me.apps.some((a) => a.id === "ai-tracker") ? [{ href: "/ai-tracker", label: "AI Tracker", icon: Bot }] : []),
+    ...(me.apps.some((a) => a.id === "ai-tracker") ? [{ href: "/ai-tracker", label: "Claude Usage Report", icon: Bot, disabled: true, badge: "Coming soon" }] : []),
     ...(showAccess ? [{ href: "/access-control", label: "Access control", icon: ShieldCheck }] : []),
     { href: "/settings", label: "Settings", icon: Settings },
   ];

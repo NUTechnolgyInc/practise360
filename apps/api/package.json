@@ -9,7 +9,8 @@
     "seed": "node src/seed/index.js",
     "test": "node --test test/",
     "sync-roles": "node src/seed/sync-roles.js",
-    "set-email": "node src/seed/set-email.js"
+    "set-email": "node src/seed/set-email.js",
+    "reset": "node src/seed/reset.js"
   },
   "dependencies": {
     "cors": "^2.8.6",

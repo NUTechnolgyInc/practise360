@@ -18,7 +18,26 @@ export function NavList({ items, collapsed = false, onNavigate }) {
   const pathname = usePathname();
   return (
     <nav aria-label="Apps" className="flex-1 space-y-1.5 overflow-y-auto p-3">
-      {items.map(({ href, label, icon: Icon }) => {
+      {items.map(({ href, label, icon: Icon, disabled, badge }) => {
+        // A placeholder for an app that isn't built yet: visible so people know it's coming, but not a link.
+        if (disabled) {
+          return (
+            <span
+              key={href}
+              aria-disabled="true"
+              title={collapsed ? `${label} (${badge})` : undefined}
+              className={cn("flex cursor-not-allowed items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-gray-500", collapsed && "justify-center")}
+            >
+              <Icon className="size-5 shrink-0" aria-hidden="true" />
+              {!collapsed && (
+                <span className="flex min-w-0 flex-col leading-tight">
+                  <span className="truncate">{label}</span>
+                  {badge && <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">{badge}</span>}
+                </span>
+              )}
+            </span>
+          );
+        }
         const active = isActive(pathname, href);
         return (
           <Link

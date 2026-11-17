@@ -28,7 +28,7 @@ platform                         (global)
 
 | Collection | Key fields | Notes |
 |---|---|---|
-| `users` | _id (ObjectId), username (unique), displayName, email (unique when set, lower-case), isActive | No password stored (dev login uses hardcoded `password`, by username or email) |
+| `users` | _id (ObjectId), username (unique), displayName, email (unique when set, lower-case), isActive, googleOnly | No password stored (dev login uses hardcoded `password`, by username or email). `googleOnly` accounts (real people on the demo deployment, and anyone whose account was created by Google sign-in) refuse the dev password and are left out of the login page's demo list |
 | `invitations` | email, kind (`member` \| `manager` \| `lead`), practiceId, groupId, keepPrevious, tokenHash, status (`pending` \| `accepted` \| `cancelled`), invitedBy, expiresAt, delivery, acceptedBy/At, cancelledBy/At/Reason | Someone invited into a practice by email before they have an account. Only a SHA-256 of the link's token is stored |
 | `apps` | _id (`practices`, `cert-tracker`, `ai-tracker`), name, permPrefix | |
 | `practices` | _id (slug), appId, name, description, isArchived, createdBy | DE, Platform, QA, AI seeded; Practices Admin adds more |

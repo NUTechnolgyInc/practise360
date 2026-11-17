@@ -15,7 +15,8 @@ test.describe("Role-based app visibility", () => {
 
       const main = page.getByRole("main");
       for (const app of ALL_APPS) {
-        const tile = main.getByRole("heading", { name: app, exact: true });
+        // The AI Tracker tile is shown as the upcoming Claude Usage Report.
+        const tile = main.getByRole("heading", { name: app === "AI Tracker" ? "Claude Usage Report" : app, exact: true });
         if (u.apps.includes(app)) await expect(tile, app).toBeVisible();
         else await expect(tile, app).toHaveCount(0);
       }
@@ -23,9 +24,12 @@ test.describe("Role-based app visibility", () => {
       const nav = page.getByRole("navigation", { name: "Apps" });
       await expect(nav.getByRole("link", { name: "Home" })).toBeVisible();
       await expect(nav.getByRole("link", { name: "Settings" })).toBeVisible();
-      for (const [key, label] of [["practices", "Practices"], ["ai", "AI Tracker"], ["access", "Access control"]]) {
+      for (const [key, label] of [["practices", "Practices"], ["access", "Access control"]]) {
         await expect(nav.getByRole("link", { name: label, exact: true }), label).toHaveCount(u.nav[key] ? 1 : 0);
       }
+      // Claude Usage Report is listed but disabled until it's built: never a link.
+      await expect(nav.getByText("Claude Usage Report"), "Claude Usage Report").toHaveCount(u.nav.ai ? 1 : 0);
+      await expect(nav.getByRole("link", { name: /Claude Usage Report|AI Tracker/ })).toHaveCount(0);
       const certs = u.apps.includes("Certification Tracker");
       await expect(nav.getByRole("link", { name: "Certifications", exact: true }), "Certifications").toHaveCount(certs ? 1 : 0);
     });
@@ -56,8 +60,10 @@ test.describe("Role-based app visibility", () => {
     await page.getByRole("tab", { name: "Contributions" }).click();
     await expect(page.getByRole("heading", { name: "Practice contributions" })).toBeVisible();
     await page.getByRole("navigation", { name: "Breadcrumb" }).getByRole("link", { name: "Home" }).click();
-    await page.getByRole("link", { name: /AI Tracker.*Claude usage/ }).click();
-    await expect(page.getByRole("heading", { name: "Claude usage reports" })).toBeVisible();
+    // Claude Usage Report is "Coming soon": its tile is not a link.
+    const main = page.getByRole("main");
+    await expect(main.getByRole("heading", { name: "Claude Usage Report", exact: true })).toBeVisible();
+    await expect(main.getByRole("link", { name: /Claude Usage Report|AI Tracker/ })).toHaveCount(0);
   });
 
   test("[NAV-05] the current page is highlighted in the sidebar", async ({ page, loginAs }) => {

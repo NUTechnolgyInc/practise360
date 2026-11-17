@@ -7,6 +7,13 @@ Add entries under **Unreleased** in the same PR as the change, grouped as Added 
 
 ## [Unreleased]
 
+### Changed
+- The **AI Tracker** sidebar entry is now **Claude Usage Report — Coming soon**, greyed out and not clickable. Its Home tile matches (Coming soon, not a link).
+
+### Security
+- **Google-only accounts**: accounts created by Google sign-in, and the real people set up on the demo deployment, can't be opened with the shared dev password and don't appear in the login page's demo user list.
+- New `npm run reset -w api` script empties a database (after writing a full JSON backup) and starts it over with only the RBAC catalog and the Super Admins given on the command line.
+
 ### Added
 - **Add several people by email at once**: Add member on a practice and on a group (for Practice Managers and Practices Admin) has a new **Add by email** tab. Type addresses separated by commas — each turns into a chip with an × to remove it (Enter, leaving the field or pasting a list works too; Backspace removes the last one; invalid addresses show in red and repeats are ignored). Submitting handles each address: people already on Practise360 are added straight away, everyone else is emailed an invitation, and anyone already in the practice is left as they are. A summary toast appears, or a per-address list (with join links when email isn't set up) if anything needs attention. API: `POST /practices/:id/invites/bulk` (up to 50 addresses, same checks per address as a single invite), documented in Swagger. UI kit: new `EmailChipsInput` / `EmailChip`.
 - **Add a contribution for someone else**: Practice Leads (for their own group's members), Practice Managers (anyone in their practice) and Practices Admin can pick an **Owner** on *Start a contribution* to add it on a member's behalf. The member owns it and submits it as usual. It's marked **"Added by …"** on the contributions list, on the contribution's page and in its timeline, and whoever added it can't review or approve it. API: optional `ownerId` on `POST /contributions`, `GET /contributions/practices/:id/owners`, and `addedBy` / `canAddForIn` in responses.

@@ -13,7 +13,8 @@ import { cn } from "@/lib/cn";
 const APP_INFO = {
   practices: { icon: Users, description: "Practices, their groups and Leads, and practice contributions", href: "/practices" },
   "cert-tracker": { icon: Award, description: "Plan certifications and courses, get completions approved", href: "/certifications" },
-  "ai-tracker": { icon: Bot, description: "Monthly Claude usage reports", href: "/ai-tracker" },
+  // Not open yet: the tile shows "Coming soon" and isn't a link, matching the disabled sidebar entry.
+  "ai-tracker": { icon: Bot, name: "Claude Usage Report", description: "Monthly Claude usage reports" },
 };
 
 function Home() {
@@ -51,7 +52,7 @@ function Home() {
                     </span>
                     {href ? <ChevronRight className="size-5 text-gray-400" aria-hidden="true" /> : <Badge variant="neutral">Coming soon</Badge>}
                   </div>
-                  <h3 className="text-base font-bold">{app.name}</h3>
+                  <h3 className="text-base font-bold">{info.name ?? app.name}</h3>
                   <p className="mt-1 text-xs text-nu-muted-teal">{description}</p>
                 </div>
               );

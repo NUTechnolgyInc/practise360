@@ -23,7 +23,7 @@ router.get("/config", async (req, res, next) => {
 /** Dev only: seeded accounts with a role summary, so the login page can offer one-click demo users. */
 async function demoUsers() {
   await connectDb();
-  const [users, assignments, roles] = await Promise.all([User.find({ isActive: true }).lean(), RoleAssignment.find().lean(), Role.find().lean()]);
+  const [users, assignments, roles] = await Promise.all([User.find({ isActive: true, googleOnly: { $ne: true } }).lean(), RoleAssignment.find().lean(), Role.find().lean()]);
   const roleName = new Map(roles.map((r) => [r._id, r.name]));
   return users.map((u) => ({
     username: u.username,
@@ -43,7 +43,7 @@ router.post("/login", async (req, res, next) => {
     const login = String(username).toLowerCase().trim();
     const user = await User.findOne(login.includes("@") ? { email: login } : { username: login }).lean();
     // Same message for unknown user and wrong password — don't reveal which usernames exist.
-    if (!user || !user.isActive || password !== DEV_PASSWORD) return res.status(401).json({ error: "Invalid username, email or password" });
+    if (!user || !user.isActive || user.googleOnly || password !== DEV_PASSWORD) return res.status(401).json({ error: "Invalid username, email or password" });
 
     res.json({ token: signToken(user._id) });
   } catch (err) {
@@ -64,7 +64,7 @@ router.post("/google", async (req, res, next) => {
     await connectDb();
     // First Google sign-in creates the account with no roles (owner decision 2026-11-17, docs/rbac.md "Auth"):
     // it opens no app until someone grants a role, and the home page tells them so.
-    const { user, created } = await findOrCreateByEmail(identity.email, identity.name);
+    const { user, created } = await findOrCreateByEmail(identity.email, identity.name, { googleOnly: true });
     if (!user.isActive) return res.status(403).json({ error: "This account is deactivated" });
 
     res.json({ token: signToken(user._id), created });
