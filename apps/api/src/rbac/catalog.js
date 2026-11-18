@@ -19,6 +19,7 @@ const PERMISSIONS = [
   ["platform.users.manage", "platform", "Create and disable users"],
   ["platform.apps.assign", "platform", "Grant app-level admin roles"],
   ["platform.roles.manage", "platform", "Edit system roles and their permissions"],
+  ["platform.audit.view", "platform", "View the audit log of every action in the portal"],
   ["practices.practice.create", "practices", "Create practices"],
   ["practices.practice.update", "practices", "Edit practice details"],
   ["practices.practice.archive", "practices", "Archive practices"],

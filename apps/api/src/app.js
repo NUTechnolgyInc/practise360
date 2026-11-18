@@ -1,7 +1,8 @@
 require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
-const { authenticate } = require("./middleware/auth");
+const { authenticate, requirePermission } = require("./middleware/auth");
+const { auditTrail } = require("./lib/audit");
 
 // Dev password login must never reach a real production (CLAUDE.md → Auth). A demo deployment on seeded,
 // synthetic data can opt in explicitly, so the guard can't be switched off by setting AUTH_MODE alone.
@@ -16,6 +17,9 @@ app.use(cors({ origin: origins }));
 // the raw body themselves, so an uploaded .json attachment must not be parsed here.
 const isFileUpload = (req) => /\/files(\?|$)/.test(req.url);
 app.use(express.json({ limit: "1mb", type: (req) => !isFileUpload(req) && /json/.test(req.headers["content-type"] || "") }));
+
+// Before every router: each write request and sign-in is recorded, including the refused ones.
+app.use(auditTrail);
 
 app.get("/", (req, res) => res.json({ name: "practise360-api" }));
 app.get("/health", (req, res) => res.json({ status: "ok" }));
@@ -35,6 +39,7 @@ app.use("/practices", authenticate, require("./routes/practices"));
 app.use("/contributions", authenticate, require("./routes/contributions"));
 app.use("/certifications", authenticate, require("./routes/certifications"));
 app.use("/people", authenticate, require("./routes/people"));
+app.use("/audit-log", authenticate, requirePermission("platform.audit.view"), require("./routes/audit-log"));
 
 app.use((req, res) => res.status(404).json({ error: "Not found" }));
 // eslint-disable-next-line no-unused-vars

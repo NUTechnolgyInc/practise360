@@ -10,6 +10,7 @@ const { bad, wrap, str } = require("../lib/http");
 const structure = require("../lib/practice-structure");
 const inv = require("../lib/invites");
 const { findOrCreateByEmail } = require("../lib/accounts");
+const { noteActor } = require("../lib/audit");
 
 const router = express.Router();
 
@@ -67,10 +68,12 @@ router.post(
     const ready = await prepare(req.params.token);
     if (ready.error) return bad(res, ready.error, ready.status);
     const { invite, tree, inviter, roles, account } = ready;
+    if (account) noteActor(res, account);
     if (account && !account.isActive) return bad(res, "Your Practise360 account is deactivated. Ask an admin to restore it.", 403);
     const displayName = str(req.body?.displayName, 80, "Name");
 
     const user = account ?? (await findOrCreateByEmail(invite.email, displayName)).user;
+    noteActor(res, user);
     const userId = String(user._id);
     const { practiceId, groupId } = invite;
     const actor = { user: inviter, tree };

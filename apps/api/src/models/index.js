@@ -365,7 +365,40 @@ const CertFile = model(
   "cert_files",
 );
 
+// Audit log (docs/rbac.md §4 "Audit log"): one append-only entry per write request and sign-in, recorded by
+// lib/audit.js. Actor names are copied in so an entry still reads right after the person is renamed or removed.
+// Nothing in the API updates or deletes entries.
+const AUDIT_OUTCOMES = ["success", "denied", "failed"];
+const auditLogSchema = new Schema(
+  {
+    at: { type: Date, default: Date.now },
+    actorId: { type: ObjectId, ref: "User", default: null },
+    actorName: { type: String, default: null },
+    actorUsername: { type: String, default: null },
+    action: { type: String, required: true }, // e.g. "practices.member.add"
+    label: { type: String, required: true },
+    category: { type: String, required: true },
+    method: { type: String, required: true },
+    route: { type: String, required: true }, // the route pattern, never the raw URL (invite links carry a token)
+    params: { type: Schema.Types.Mixed, default: {} },
+    details: { type: Schema.Types.Mixed, default: {} }, // request body with secrets and file bytes removed
+    resultId: { type: String, default: null }, // id of what a create returned
+    status: { type: Number, required: true },
+    outcome: { type: String, enum: AUDIT_OUTCOMES, required: true },
+    error: { type: String, default: null },
+    ip: String,
+    userAgent: String,
+  },
+  { versionKey: false },
+);
+auditLogSchema.index({ at: -1 });
+auditLogSchema.index({ actorId: 1, at: -1 });
+auditLogSchema.index({ category: 1, at: -1 });
+const AuditLog = model("AuditLog", auditLogSchema, "audit_logs");
+
 module.exports = {
+  AuditLog,
+  AUDIT_OUTCOMES,
   CertCatalogItem,
   CertPlan,
   CertFile,

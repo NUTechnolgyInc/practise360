@@ -40,6 +40,7 @@ platform                         (global)
 | `permissions` | _id (= key), appId, description | Static catalog, seeded from `apps/api/src/rbac/catalog.js` |
 | `roles` | _id, name, scopeType, scopeId, isSystem, assignableFrom, **permissions[]** | Permissions are embedded (no join collection). `scopeId` set on app roles and on custom roles (owning practice) |
 | `role_assignments` | userId, roleId, scopeType, scopeId, grantedBy, grantedAt | Unique on (userId, roleId, scopeType, scopeId) |
+| `audit_logs` | at, actorId, actorName, actorUsername, action, label, category, method, route, params, details, resultId, status, outcome, error, ip, userAgent | Append-only record of every write request and sign-in (§4 "Audit log") |
 
 `scopeType` ∈ `platform | app | practice | group`. A user can hold several assignments (e.g. Practitioner in DE + Lead of DE Fullstack, Practitioner in AI).
 An assignment whose scope type doesn't match its role's (left over from a role changing level) grants nothing.
@@ -53,6 +54,7 @@ Format: `<app>.<resource>.<action>`. `:own` suffix = only on records the user ow
 - `platform.users.manage` — create/disable users
 - `platform.apps.assign` — grant app-level admin roles
 - `platform.roles.manage` — edit system roles and their permissions (Super Admin only, via `*`)
+- `platform.audit.view` — view the audit log (Super Admin only, via `*` — see "Audit log" in §4)
 
 **Practices app**
 - `practices.practice.create`, `practices.practice.update`, `practices.practice.archive`
@@ -201,6 +203,17 @@ Added 2026-11-13 — pending owner sign-off. Every person's name in the portal l
 - Rules live in one pure function, `profileView()` in `apps/api/src/rbac/profile-access.js`; records are still filtered one by one with `actionsFor()` / `certActionsFor()`.
 
 ⁶ Email is shown when set on the user (the seed sets none). It's the only field no other screen shows yet — part of the sign-off.
+
+### Audit log
+Added 2026-11-18 at the owner's request: every action in the portal is recorded and shown to Super Admin.
+
+- **What's recorded:** every write request (POST / PUT / PATCH / DELETE) on every route, and every sign-in (password, Google, accepting an invitation) — **including refused and failed ones** (`outcome`: `success`, `denied` = 401/403, `failed` = any other error), with the error the caller saw. Reads (opening a page, downloading a file) are not recorded.
+- **Each entry:** when, who (user id plus the name and username they had then, so it still reads right after a rename), the action (`rbac.assignment.grant` → "Granted a role") and its area, the route **pattern** (never the raw URL — an invitation link's token is in it), path params, the request's fields, the id a create returned, HTTP status, IP and user agent.
+- **Never stored:** any field whose name looks like a secret (password, token, credential, secret, authorization, cookie, otp) at any depth, file bytes (uploads log the file name only), and text beyond 200 characters.
+- **Who sees it:** `platform.audit.view`, a platform-scope permission, so only Super Admin holds it (`*`). Custom roles can't carry `platform.*`, and Super Admin is the only platform-scope role.
+- **Append-only:** no API route edits or deletes an entry. No retention limit yet.
+- **How:** one app-level middleware (`apps/api/src/lib/audit.js`) names each request from the action list in `apps/api/src/lib/audit-actions.js`, and holds the response until the entry is written (at most 3 s; a failed write is logged on the server and never fails the action itself). `test/audit.test.js` fails if a write route has no entry in that list.
+- Collection: `audit_logs` (§2). API: `GET /audit-log` with filters (search, area, outcome, person, date range) and pages of 50.
 
 ### Custom roles
 - Created **inside a practice** by anyone with `practices.roles.manage` there (Practice Manager, Practices Admin).

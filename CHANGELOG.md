@@ -7,6 +7,9 @@ Add entries under **Unreleased** in the same PR as the change, grouped as Added 
 
 ## [Unreleased]
 
+### Added
+- **Audit log** (`/audit-log`, Super Admin only, in the sidebar): every change and sign-in across Practise360 — roles granted and revoked, roles edited, practices, groups, members, invitations, contributions, certifications, usage reports, and password / Google / invitation sign-ins — including attempts that were refused or failed, with the error shown. Each row shows when, who, what (with people, practices, groups, roles, contributions and certifications by name), the outcome, and the IP address. Filter by text, area, outcome, person and date range; 50 per page, newest first. Passwords, tokens and file contents are never recorded, and entries can't be edited or deleted. New permission `platform.audit.view` — run `npm run sync-roles -w api` on existing databases. API: `GET /audit-log`, documented in Swagger.
+
 ### Changed
 - The **AI Tracker** sidebar entry is now **Claude Usage Report — Coming soon**, greyed out and not clickable. Its Home tile matches (Coming soon, not a link).
 

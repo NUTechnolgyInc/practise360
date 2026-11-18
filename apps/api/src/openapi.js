@@ -5,6 +5,7 @@ const practices = require("./openapi-practices");
 const contributions = require("./openapi-contributions");
 const certifications = require("./openapi-certifications");
 const people = require("./openapi-people");
+const audit = require("./openapi-audit");
 
 const err = (description) => ({ description, content: { "application/json": { schema: { $ref: "#/components/schemas/Error" } } } });
 const json = (description, schema) => ({ description, content: { "application/json": { schema } } });
@@ -44,6 +45,7 @@ function buildSpec({ serverUrl } = {}) {
       contributions.tag,
       certifications.tag,
       people.tag,
+      audit.tag,
     ],
     components: {
       securitySchemes: {
@@ -58,6 +60,7 @@ function buildSpec({ serverUrl } = {}) {
         ...contributions.schemas,
         ...certifications.schemas,
         ...people.schemas,
+        ...audit.schemas,
         Error: { type: "object", required: ["error"], properties: { error: { type: "string", example: "Missing permission practices.roles.manage" } } },
         Id: { type: "object", required: ["id"], properties: { id: { type: "string" } } },
         ScopeType: { type: "string", enum: ["platform", "app", "practice", "group"] },
@@ -505,6 +508,7 @@ function buildSpec({ serverUrl } = {}) {
       ...contributions.paths,
       ...certifications.paths,
       ...people.paths,
+      ...audit.paths,
     },
   };
 }

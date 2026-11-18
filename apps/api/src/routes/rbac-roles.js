@@ -4,6 +4,7 @@ const { Permission, Role, RoleAssignment } = require("../models");
 const { can, canWithin, holdsExactly } = require("../rbac/engine");
 const { CUSTOM_ROLE_PERMISSIONS } = require("../rbac/catalog");
 const { requireAnyScope } = require("../middleware/auth");
+const { noteDetails } = require("../lib/audit");
 
 const router = express.Router();
 const practiceScope = (id) => ({ type: "practice", id });
@@ -139,6 +140,7 @@ router.delete(
   wrap(async (req, res) => {
     const role = await Role.findById(req.params.id).lean();
     if (!role) return res.status(404).json({ error: "Role not found" });
+    noteDetails(res, { name: role.name, practiceId: role.scopeId });
     if (role.isSystem) return res.status(400).json({ error: "System roles can't be deleted" });
     if (!can(req.user, "practices.roles.manage", practiceScope(role.scopeId), undefined, req.tree.practices)) {
       return res.status(403).json({ error: "Missing permission practices.roles.manage" });

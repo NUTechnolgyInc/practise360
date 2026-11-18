@@ -44,6 +44,10 @@ const STATUS_VARIANT = {
   // Claude usage report submission
   Submitted: "success",
   Pending: "warning",
+  // Audit log outcomes
+  Success: "success",
+  Denied: "danger",
+  Failed: "warning",
 };
 
 export function StatusBadge({ status, className }) {

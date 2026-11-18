@@ -6,6 +6,7 @@ const { describeScope } = require("../rbac/present");
 const { requireAnyScope } = require("../middleware/auth");
 const structure = require("../lib/practice-structure");
 const { cancelPending } = require("../lib/invites");
+const { noteDetails } = require("../lib/audit");
 
 const router = express.Router();
 const wrap = (fn) => (req, res, next) => fn(req, res).catch(next);
@@ -107,6 +108,7 @@ router.delete(
     if (!mongoose.isValidObjectId(req.params.id)) return res.status(404).json({ error: "Assignment not found" });
     const a = await RoleAssignment.findById(req.params.id).lean();
     if (!a) return res.status(404).json({ error: "Assignment not found" });
+    noteDetails(res, { userId: String(a.userId), roleId: a.roleId, scopeType: a.scopeType, scopeId: a.scopeId });
     const role = await Role.findById(a.roleId).lean();
 
     // Revoking is guarded like granting: a Manager can't remove another Manager.

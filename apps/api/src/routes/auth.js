@@ -4,6 +4,7 @@ const { Role, RoleAssignment, User } = require("../models");
 const { signToken, isDevAuth } = require("../middleware/auth");
 const { clientId, isGoogleEnabled, verifyGoogleCredential } = require("../lib/google-auth");
 const { findOrCreateByEmail } = require("../lib/accounts");
+const { noteActor } = require("../lib/audit");
 
 const router = express.Router();
 const DEV_PASSWORD = "password";
@@ -45,6 +46,7 @@ router.post("/login", async (req, res, next) => {
     // Same message for unknown user and wrong password — don't reveal which usernames exist.
     if (!user || !user.isActive || user.googleOnly || password !== DEV_PASSWORD) return res.status(401).json({ error: "Invalid username, email or password" });
 
+    noteActor(res, user);
     res.json({ token: signToken(user._id) });
   } catch (err) {
     next(err);
@@ -65,6 +67,7 @@ router.post("/google", async (req, res, next) => {
     // First Google sign-in creates the account with no roles (owner decision 2026-11-17, docs/rbac.md "Auth"):
     // it opens no app until someone grants a role, and the home page tells them so.
     const { user, created } = await findOrCreateByEmail(identity.email, identity.name, { googleOnly: true });
+    noteActor(res, user);
     if (!user.isActive) return res.status(403).json({ error: "This account is deactivated" });
 
     res.json({ token: signToken(user._id), created });

@@ -4,6 +4,8 @@ const assert = require("node:assert/strict");
 const http = require("node:http");
 
 process.env.JWT_SECRET ||= "test-only";
+// These POST to the real app; without this the audit log would write to whatever database .env points at.
+process.env.AUDIT_LOG = "off";
 const { identityFromClaims } = require("../src/lib/google-auth");
 
 const claims = (over = {}) => ({ email: "Alex.Rivera@Example.com", email_verified: true, name: "Alex Rivera", ...over });

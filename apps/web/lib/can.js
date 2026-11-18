@@ -31,4 +31,7 @@ export function canAnywhere(me, ...permissions) {
   return !!me?.grants.some((g) => g.permissions.includes("*") || permissions.some((p) => g.permissions.includes(p)));
 }
 
+/** Platform-scope only, so in practice Super Admin (docs/rbac.md §4 "Audit log"). */
+export const AUDIT_VIEW_PERM = "platform.audit.view";
+
 export const RBAC_PORTAL_PERMS = ["practices.roles.view", "practices.roles.assign", "platform.apps.assign"];

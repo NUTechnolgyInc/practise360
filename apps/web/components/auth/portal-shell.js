@@ -2,11 +2,11 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Award, Bot, Home, Lightbulb, Loader2, Settings, ShieldCheck } from "lucide-react";
+import { Award, Bot, History, Home, Lightbulb, Loader2, Settings, ShieldCheck } from "lucide-react";
 import { AppShell } from "@/components/layout";
 import { NoAccess } from "@/components/ui";
 import { practicesHome } from "@/components/practices/practices-nav";
-import { canAnywhere, RBAC_PORTAL_PERMS } from "@/lib/can";
+import { AUDIT_VIEW_PERM, canAnywhere, RBAC_PORTAL_PERMS } from "@/lib/can";
 import { profilePath } from "@/lib/people";
 import { useSession } from "./session-provider";
 
@@ -34,6 +34,7 @@ export function PortalShell({ breadcrumbs, requires, children }) {
     ...(me.apps.some((a) => a.id === "cert-tracker") ? [{ href: "/certifications", label: "Certifications", icon: Award }] : []),
     ...(me.apps.some((a) => a.id === "ai-tracker") ? [{ href: "/ai-tracker", label: "Claude Usage Report", icon: Bot, disabled: true, badge: "Coming soon" }] : []),
     ...(showAccess ? [{ href: "/access-control", label: "Access control", icon: ShieldCheck }] : []),
+    ...(canAnywhere(me, AUDIT_VIEW_PERM) ? [{ href: "/audit-log", label: "Audit log", icon: History }] : []),
     { href: "/settings", label: "Settings", icon: Settings },
   ];
   const user = {
