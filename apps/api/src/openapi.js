@@ -85,7 +85,7 @@ function buildSpec({ serverUrl } = {}) {
             },
             demoUsers: {
               type: "array",
-              description: "Only present when devLogin is true",
+              description: "Only present when devLogin is true and the API has DEMO_USERS_ENABLED=true",
               items: {
                 type: "object",
                 properties: {

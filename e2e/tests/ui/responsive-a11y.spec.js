@@ -14,7 +14,7 @@ test.describe("Phone width (375px)", () => {
     await page.getByLabel("Username").fill("de.dev1");
     await page.getByLabel("Password").fill("password");
     await page.getByRole("button", { name: "Sign in" }).click();
-    await expect(page.getByRole("heading", { name: "Welcome, Riley" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Your apps" })).toBeVisible();
     await noHorizontalScroll(page);
   });
 
@@ -66,7 +66,7 @@ test.describe("Keyboard only", () => {
     await expect(page.getByLabel("Password")).toBeFocused();
     await page.keyboard.type("password");
     await page.keyboard.press("Enter");
-    await expect(page.getByRole("heading", { name: "Welcome, Casey" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Your apps" })).toBeVisible();
   });
 
   test("[KB-02] dialogs take focus when opened and give it back when closed with Escape", async ({ page, loginAs }) => {

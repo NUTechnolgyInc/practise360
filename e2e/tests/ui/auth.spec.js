@@ -23,12 +23,12 @@ test.describe("Login & logout", () => {
     await expect(page.getByLabel("Password")).toHaveAttribute("type", "password");
   });
 
-  test("[AUTH-UI-02] valid credentials land on Home with a personal welcome", async ({ page }) => {
+  test("[AUTH-UI-02] valid credentials land on Home", async ({ page }) => {
     await page.goto("/login");
     await fillLogin(page, "de.dev1", "password");
     await page.getByRole("button", { name: "Sign in" }).click();
     await expect(page).toHaveURL(/\/$/);
-    await expect(page.getByRole("heading", { name: "Welcome, Riley" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Your apps" })).toBeVisible();
   });
 
   test("[AUTH-UI-03] wrong password shows an inline error and keeps the user on /login", async ({ page }) => {
@@ -57,21 +57,21 @@ test.describe("Login & logout", () => {
     await expect(page.getByText("Invalid username, email or password")).toBeVisible();
     await page.getByLabel("Password").fill("password");
     await page.getByRole("button", { name: "Sign in" }).click();
-    await expect(page.getByRole("heading", { name: "Welcome, Casey" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Your apps" })).toBeVisible();
   });
 
   test("[AUTH-UI-06] mixed-case username with spaces still signs in", async ({ page }) => {
     await page.goto("/login");
     await fillLogin(page, "  QA.Lead ", "password");
     await page.getByRole("button", { name: "Sign in" }).click();
-    await expect(page.getByRole("heading", { name: "Welcome, Rowan" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Your apps" })).toBeVisible();
   });
 
   test("[AUTH-UI-07] pressing Enter in the password field submits the form", async ({ page }) => {
     await page.goto("/login");
     await fillLogin(page, "de.manager", "password");
     await page.getByLabel("Password").press("Enter");
-    await expect(page.getByRole("heading", { name: "Welcome, Morgan" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Your apps" })).toBeVisible();
   });
 
   test("[AUTH-UI-08] picking a demo user fills the form, and signing in works", async ({ page }) => {
@@ -81,7 +81,7 @@ test.describe("Login & logout", () => {
     await expect(page.getByLabel("Username")).toHaveValue("cert.admin");
     await expect(page.getByLabel("Password")).toHaveValue("password");
     await page.getByRole("button", { name: "Sign in" }).click();
-    await expect(page.getByRole("heading", { name: "Welcome, Reese" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Your apps" })).toBeVisible();
   });
 
   test("[AUTH-UI-09] 'Continue with Google' explains it isn't available yet", async ({ page }) => {
@@ -103,7 +103,7 @@ test.describe("Login & logout", () => {
     await loginAs("de.dev1");
     await page.goto("/login");
     await expect(page).toHaveURL(/\/$/);
-    await expect(page.getByRole("heading", { name: "Welcome, Riley" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Your apps" })).toBeVisible();
   });
 
   test("[AUTH-UI-12] sign out from the user menu clears the session; Back and reload don't restore it", async ({ page }) => {
@@ -168,7 +168,7 @@ test.describe("Login & logout", () => {
     await page.getByLabel("Username").fill("de.dev1");
     await page.getByLabel("Password").fill("password");
     await page.getByRole("button", { name: "Sign in" }).click();
-    await expect(page.getByRole("heading", { name: "Welcome, Riley" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Your apps" })).toBeVisible();
   });
 
   test("[AUTH-UI-16] a session that expires during an action (upload) also returns the user to sign in", async ({ page, loginAs, as }) => {

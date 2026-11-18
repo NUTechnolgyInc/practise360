@@ -12,11 +12,15 @@ Add entries under **Unreleased** in the same PR as the change, grouped as Added 
 - **Audit log** (`/audit-log`, Super Admin only, in the sidebar): every change and sign-in across Practise360 — roles granted and revoked, roles edited, practices, groups, members, invitations, contributions, certifications, usage reports, and password / Google / invitation sign-ins — including attempts that were refused or failed, with the error shown. Each row shows when, who, what (with people, practices, groups, roles, contributions and certifications by name), the outcome, and the IP address. Filter by text, area, outcome, person and date range; 50 per page, newest first. Passwords, tokens and file contents are never recorded, and entries can't be edited or deleted. New permission `platform.audit.view` — run `npm run sync-roles -w api` on existing databases. API: `GET /audit-log`, documented in Swagger.
 
 ### Changed
+- **Simpler Home page**: the "Welcome, …" banner and the **Access control** and **Settings** cards at the bottom are gone — Home is just your apps. Access control and Settings are still in the sidebar.
+- **Claude Usage Report looks disabled on Home**: its tile is greyed out with a dashed border, a lock on the **Coming soon** badge and a not-allowed cursor, so it no longer looks like an app you can open.
+- **Invite several contributors at once**: on a contribution's **People** card, **Invite people** opens the same searchable person picker used elsewhere — tick as many practice members as you like and invite them in one go ("Invite 2 people"). It replaces the plain drop-down that invited one person at a time.
 - **Invitations are accepted when you sign in**: signing in (Google or dev login) with an invited email now accepts its open invitations, so the join link is no longer required — and no longer shown after inviting. Locally (no Google sign-in), an invited person signs in with their email and the dev password and the account is created then.
 - **Add member picks several people at once**: on a practice and on a group, Add member now has checkboxes (tab **Pick people**) — tick as many people as you like, and type emails to tick invitations for people not on Practise360 yet. One button adds them all ("Add 3 people"); a toast sums it up, or a list shows anyone who couldn't be added and why.
 - The **AI Tracker** sidebar entry is now **Claude Usage Report — Coming soon**, greyed out and not clickable. Its Home tile matches (Coming soon, not a link).
 
 ### Security
+- **Demo users panel is opt-in**: the login page's Demo users list only shows when the API has `DEMO_USERS_ENABLED=true` (plus `AUTH_MODE=dev`). Unset, the list of usernames and roles isn't sent to the browser; password login still works.
 - **Google-only accounts**: accounts created by Google sign-in, and the real people set up on the demo deployment, can't be opened with the shared dev password and don't appear in the login page's demo user list.
 - New `npm run reset -w api` script empties a database (after writing a full JSON backup) and starts it over with only the RBAC catalog and the Super Admins given on the command line.
 

@@ -14,7 +14,7 @@ Two Vercel projects from the same repo:
 
 ## Demo deployment (rlal-nu1)
 
-Live since 2026-11-17 on Vercel team **rlal-nu1's projects**, with seeded demo data and demo passwords on (`AUTH_MODE=dev` + `ALLOW_DEMO_LOGIN_IN_PRODUCTION=true`). Anyone with the URL can sign in as any seeded user.
+Live since 2026-11-17 on Vercel team **rlal-nu1's projects**, with seeded demo data and demo passwords on (`AUTH_MODE=dev` + `ALLOW_DEMO_LOGIN_IN_PRODUCTION=true`). Anyone with the URL can sign in as any seeded user. Since 2026-11-18 the login page's Demo users panel is off there (`DEMO_USERS_ENABLED=false`).
 
 | Project | Root | URL |
 |---|---|---|
@@ -43,6 +43,7 @@ VERCEL_ORG_ID=team_UfgeFSA47qY2QQNgCJY5wEiy VERCEL_PROJECT_ID=prj_Vl1r8Y4JNHhkkV
 | `NEXT_PUBLIC_API_URL` | web | Base URL of the API |
 | `AUTH_MODE` | api | `dev` enables the hardcoded-password login. **Must not be `dev` in production** — the API refuses to start if it is on a Vercel production deploy, unless `ALLOW_DEMO_LOGIN_IN_PRODUCTION` is set. |
 | `ALLOW_DEMO_LOGIN_IN_PRODUCTION` | api | `true` lets `AUTH_MODE=dev` run on a Vercel production deploy. **Only for a demo on seeded, synthetic data** — anyone with the URL can sign in as any seeded user, Super Admin included. Remove it (and `AUTH_MODE`) before real people or real data use the deployment. |
+| `DEMO_USERS_ENABLED` | api | `true` shows the one-click **Demo users** panel on the login page (needs `AUTH_MODE=dev`). Unset or anything else = hidden, and `/auth/config` doesn't send the user list. |
 | `MONGODB_URI` | api | MongoDB connection string (e.g. Atlas) |
 | `JWT_SECRET` | api | Signs session tokens. Long random value, different per environment |
 | `WEB_ORIGIN` | api | Web URL(s) allowed by CORS, comma-separated |

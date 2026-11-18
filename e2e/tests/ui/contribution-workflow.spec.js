@@ -188,12 +188,14 @@ test.describe("People on a contribution", () => {
     await loginAs("de.lead");
     await open(page, c);
     const people = card(page, "People");
-    const picker = people.getByLabel("Practice member to invite");
+    await people.getByRole("button", { name: "Invite people" }).click();
+    const dialog = page.getByRole("dialog", { name: "Invite people to contribute" });
     // DE only (across its groups), owner excluded
-    await expect(picker.locator("option")).toHaveText(["Invite a practice member…", "Blair Kim", "Jesse Monroe", "Morgan Reyes", "Riley Patel"]);
-    await expect(people.getByRole("button", { name: "Invite" })).toBeDisabled();
-    await picker.selectOption({ label: "Riley Patel" });
-    await people.getByRole("button", { name: "Invite" }).click();
+    await expect(dialog.getByRole("checkbox")).toHaveCount(4);
+    for (const name of ["Blair Kim", "Jesse Monroe", "Morgan Reyes", "Riley Patel"]) await expect(dialog.getByText(name, { exact: true })).toBeVisible();
+    await expect(dialog.getByRole("button", { name: "Invite people" })).toBeDisabled();
+    await dialog.getByRole("checkbox", { name: /Riley Patel/ }).check();
+    await dialog.getByRole("button", { name: "Invite 1 person" }).click();
     await expect(toast(page, "Invite sent")).toBeVisible();
     await expect(people).toContainText("Invited by Casey Lin");
     await expect(people.getByText("Pending")).toBeVisible();

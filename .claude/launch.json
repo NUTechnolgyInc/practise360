@@ -114,6 +114,7 @@
         "PORT": "4100",
         "MONGODB_URI": "mongodb://127.0.0.1:27017/practise360_e2e",
         "AUTH_MODE": "dev",
+        "DEMO_USERS_ENABLED": "true",
         "JWT_SECRET": "e2e-local-stack-only-not-a-real-secret",
         "WEB_ORIGIN": "http://localhost:3200"
       }

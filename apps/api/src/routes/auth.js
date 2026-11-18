@@ -22,12 +22,17 @@ async function joinInvitedPractices(user) {
   }
 }
 
-/** Tells the login page which sign-in options exist, so the dev hint never renders outside AUTH_MODE=dev. */
+/**
+ * Tells the login page which sign-in options exist, so the dev hint never renders outside AUTH_MODE=dev.
+ * The one-click demo-user list is a separate opt-in (DEMO_USERS_ENABLED=true): a deployment can keep the password
+ * login without advertising every account's username and roles to anyone who opens the login page.
+ */
 router.get("/config", async (req, res, next) => {
   try {
     // The Client ID is public (Google shows it in the browser anyway); serving it here keeps it in one env var.
     const google = isGoogleEnabled() ? { enabled: true, clientId: clientId() } : { enabled: false };
     if (!isDevAuth()) return res.json({ devLogin: false, google });
+    if (process.env.DEMO_USERS_ENABLED !== "true") return res.json({ devLogin: true, google });
     res.json({ devLogin: true, google, demoUsers: await demoUsers() });
   } catch (err) {
     next(err);

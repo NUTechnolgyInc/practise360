@@ -38,7 +38,7 @@ module.exports = defineConfig({
     {
       command: "node apps/api/src/local.js",
       url: `${E2E.apiUrl}/health`,
-      env: { PORT: apiPort, MONGODB_URI: E2E.mongoUri, AUTH_MODE: "dev", JWT_SECRET: E2E.jwtSecret, WEB_ORIGIN: E2E.webUrl },
+      env: { PORT: apiPort, MONGODB_URI: E2E.mongoUri, AUTH_MODE: "dev", DEMO_USERS_ENABLED: "true", JWT_SECRET: E2E.jwtSecret, WEB_ORIGIN: E2E.webUrl },
       reuseExistingServer: !process.env.CI,
       timeout: 30_000,
     },

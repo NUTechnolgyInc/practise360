@@ -1,6 +1,6 @@
 import { Badge } from "@/components/ui";
 
-/** Dev-only list of seeded accounts (rendered only when the API reports AUTH_MODE=dev). Clicking one fills the form. */
+/** Dev-only list of seeded accounts (rendered only when the API has AUTH_MODE=dev and DEMO_USERS_ENABLED=true). Clicking one fills the form. */
 export function DemoUsers({ users, onPick }) {
   return (
     <div className="mt-6 border-t border-gray-100 pt-5">

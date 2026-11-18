@@ -10,8 +10,7 @@ test.describe("Role-based app visibility", () => {
     test(`[NAV-01] ${username}: Home shows exactly ${u.apps.join(", ")}; sidebar matches permissions`, async ({ page, loginAs }) => {
       await loginAs(username);
       await page.goto("/");
-      await expect(page.getByRole("heading", { name: `Welcome, ${u.name.split(" ")[0]}` })).toBeVisible();
-      await expect(page.getByText(`You can see ${u.apps.length} ${u.apps.length === 1 ? "app" : "apps"}`)).toBeVisible();
+      await expect(page.getByRole("heading", { name: "Your apps" })).toBeVisible();
 
       const main = page.getByRole("main");
       for (const app of ALL_APPS) {
@@ -64,6 +63,9 @@ test.describe("Role-based app visibility", () => {
     const main = page.getByRole("main");
     await expect(main.getByRole("heading", { name: "Claude Usage Report", exact: true })).toBeVisible();
     await expect(main.getByRole("link", { name: /Claude Usage Report|AI Tracker/ })).toHaveCount(0);
+    await expect(main.locator('[aria-disabled="true"]').filter({ hasText: "Claude Usage Report" })).toBeVisible();
+    // Access control and Settings live in the sidebar only, not as Home cards.
+    await expect(main.getByRole("link", { name: /Access control|Settings/ })).toHaveCount(0);
   });
 
   test("[NAV-05] the current page is highlighted in the sidebar", async ({ page, loginAs }) => {
