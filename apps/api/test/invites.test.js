@@ -5,7 +5,7 @@ const inv = require("../src/lib/invites");
 const { inviteEmail } = require("../src/lib/invite-email");
 const { SYSTEM_ROLES } = require("../src/rbac/catalog");
 const { CUSTOM_ROLES } = require("../src/seed/data");
-const { DE, FULLSTACK, QA_AUTO, treeWith } = require("./fixtures");
+const { DE, FULLSTACK, DEVOPS, QA_AUTO, treeWith } = require("./fixtures");
 
 const all = Object.fromEntries([...SYSTEM_ROLES, ...CUSTOM_ROLES].map((r) => [r._id, r]));
 const roles = { manager: all.practice_manager, lead: all.practice_lead, practitioner: all.practitioner };
@@ -31,10 +31,24 @@ test("inviting needs exactly what the direct appointment needs", () => {
     assert.equal(refusal(actor, { kind: "member", groupId: FULLSTACK }), null);
     assert.equal(refusal(actor, { kind: "lead", groupId: FULLSTACK }), null);
   }
-  // A Lead can't bring people in; a Manager can't invite into another practice.
+  // A Lead can't bring people into the practice without a group; a Manager can't invite into another practice.
   assert.ok(refusal(deLead, { kind: "member" }));
   assert.ok(inv.inviteRefusal(deManager, { kind: "member", practiceId: "qa", groupId: null }, roles, TREE));
   assert.ok(inv.inviteRefusal(deManager, { kind: "lead", practiceId: "qa", groupId: QA_AUTO }, roles, TREE));
+});
+
+test("a Lead may invite new members into their own group only (owner's decision 2026-11-18)", () => {
+  assert.equal(refusal(deLead, { kind: "member", groupId: FULLSTACK }), null);
+  assert.ok(refusal(deLead, { kind: "member", groupId: DEVOPS }), "not into another Lead's group");
+  assert.ok(refusal(deLead, { kind: "lead", groupId: FULLSTACK }), "never as a Lead");
+  assert.ok(refusal(deLead, { kind: "manager" }), "never as a Manager");
+  assert.ok(inv.inviteRefusal(deLead, { kind: "member", practiceId: "qa", groupId: FULLSTACK }, roles, TREE), "the group must be in the practice");
+  // Still the guard's second half: a Lead without the Practitioner permissions can't hand them out.
+  const leadOnly = userWith(["practice_lead", "group", FULLSTACK]);
+  assert.ok(refusal(leadOnly, { kind: "member", groupId: FULLSTACK }));
+  // It's an invitation right only: the direct appointment stays with the Manager and Practices Admin.
+  assert.ok(inv.appointRefusal(deLead, { kind: "member", practiceId: DE, groupId: FULLSTACK }, roles, TREE));
+  assert.equal(inv.appointRefusal(deManager, { kind: "member", practiceId: DE, groupId: FULLSTACK }, roles, TREE), null);
 });
 
 test("placing an invited member into a group also needs practices.members.manage", () => {
@@ -150,6 +164,11 @@ test("a bulk invite runs the escalation guard for every address — one the call
   // A Lead can't bring people into the practice, even ones who already have accounts.
   const accounts = new Map([["b@example.com", { _id: "u-b", displayName: "Bea", isActive: true }]]);
   for (const r of plan(deLead, { accounts })) assert.equal(r.action, "refused", r.email);
+  // Into their own group a Lead invites newcomers, but someone with an account needs the Manager to add them.
+  const intoGroup = plan(deLead, { accounts, groupId: FULLSTACK, practiceName: "Digital Engineering" });
+  assert.deepEqual(intoGroup.map((r) => r.action), ["invite", "refused"]);
+  assert.match(intoGroup[1].reason, /Bea already has an account — ask the Practice Manager/);
+  assert.deepEqual(plan(deLead, { accounts, groupId: DEVOPS }).map((r) => r.action), ["refused", "refused"]);
   // A Manager can't add into another practice.
   for (const r of inv.planBulkInvite(["a@example.com"], { actor: deManager, practiceId: "qa", roles, tree: TREE })) assert.equal(r.action, "refused");
   // Into a group needs practices.members.manage too.

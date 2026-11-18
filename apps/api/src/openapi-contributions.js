@@ -105,7 +105,7 @@ const paths = {
     },
     post: op(
       "Start a contribution",
-      "Requires `practices.contribution.create` in `practiceId`; the caller becomes the owner. With `ownerId`, adds it on that member's behalf instead: needs `practices.contribution.manage` at the member's group (else practice), so a Lead only adds for their own group. The member owns it; the caller is recorded as `addedBy` and can't review it.",
+      "Requires `practices.contribution.create` in `practiceId`; the caller becomes the owner. With `ownerId`, adds it on that member's behalf instead: needs `practices.contribution.manage` at the member's group (else practice), so a Lead only adds for their own group. The member owns it; the caller is recorded as `addedBy` and can't review it. With `ownerEmail` instead, adds it for that address: a practice member in reach is used as the owner; an account outside the practice is added to it (only if the caller could add them directly); an address with no account is **invited** as a member (into `groupId`, if given) — the caller needs the invitation right (escalation guard, or running that group, i.e. its Lead) plus `manage` where they'll sit. The invitee's account is created now, with no roles, and owns the contribution; accepting the invitation makes them a practice member.",
       {
       requestBody: body({
         type: "object",
@@ -113,6 +113,8 @@ const paths = {
         properties: {
           practiceId: { type: "string", example: "digital-engineering" },
           ownerId: { type: "string", description: "Add it on behalf of this practice member (omit to own it yourself)" },
+          ownerEmail: { type: "string", description: "Add it for this email address instead of `ownerId`; invites them if they aren't on Practise360 yet" },
+          groupId: { type: "string", description: "With `ownerEmail`: the group a new person joins (one of `inviteInto` from the owners endpoint)" },
           title: { type: "string", example: "nu-auth-shared" },
           type: { type: "string", enum: TYPES },
           customType: { type: "string", description: "Required when type is `other`" },
@@ -121,7 +123,23 @@ const paths = {
           dueDate: { type: "string", format: "date" },
         },
       }),
-        responses: { 201: json("Created", ref("Contribution")), 400: err("Validation failed"), ...COMMON },
+        responses: {
+          201: json("Created. With `ownerEmail`, also `invite` (when an invitation was sent; `acceptUrl` only in dev without SMTP) or `addedToPractice`", {
+            allOf: [
+              ref("Contribution"),
+              {
+                type: "object",
+                properties: {
+                  invite: { type: "object", properties: { id: { type: "string" }, email: { type: "string" }, delivery: { type: "string" }, acceptUrl: { type: "string" } } },
+                  addedToPractice: { type: "boolean" },
+                },
+              },
+            ],
+          }),
+          400: err("Validation failed"),
+          409: err("That email belongs to a deactivated account, or to an account the caller can't add to the practice"),
+          ...COMMON,
+        },
       },
     ),
   },
@@ -137,11 +155,21 @@ const paths = {
   "/contributions/practices/{practiceId}/owners": {
     get: {
       tags: [TAG],
-      summary: "Members the caller can add a contribution for",
-      description: "Practice members within the caller's `practices.contribution.manage` reach: a Lead gets their group's members, a Manager the whole practice.",
+      summary: "Who the caller can add a contribution for",
+      description:
+        "`members`: practice members within the caller's `practices.contribution.manage` reach — a Lead gets their group's members, a Manager the whole practice. `inviteInto`: where someone new, added by email, can be placed (`groupId` null = the practice without a group) — a Lead gets their own group.",
       security,
       parameters: [path("practiceId", "Practice id")],
-      responses: { 200: json("Members", { type: "array", items: Person }), ...COMMON },
+      responses: {
+        200: json("Members and places for someone new", {
+          type: "object",
+          properties: {
+            members: { type: "array", items: Person },
+            inviteInto: { type: "array", items: { type: "object", properties: { groupId: { type: "string", nullable: true }, name: { type: "string" } } } },
+          },
+        }),
+        ...COMMON,
+      },
     },
   },
   "/contributions/{id}": {

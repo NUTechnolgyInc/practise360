@@ -1,15 +1,17 @@
 // Public invitation links (docs/rbac.md §4 "Invitations"). No session needed: the token from the email is the proof
 // that the person owns that mailbox. Accepting creates the account (or reuses the one with that email), applies what
-// the invitation grants — re-checked against the inviter's grants right now — and signs them in.
+// the invitation grants — re-checked against the inviter's grants right now — and signs them in. Signing in with the
+// invited email does the same (lib/invite-accept.js), so the link is a shortcut, not the only way in.
 const express = require("express");
 const { connectDb } = require("../db");
-const { GroupMembership, Invitation, RoleAssignment, User } = require("../models");
+const { Invitation, User } = require("../models");
 const { loadTree, loadUser } = require("../rbac/load");
 const { signToken } = require("../middleware/auth");
 const { bad, wrap, str } = require("../lib/http");
 const structure = require("../lib/practice-structure");
 const inv = require("../lib/invites");
 const { findOrCreateByEmail } = require("../lib/accounts");
+const { applyInvitation, staleReason } = require("../lib/invite-accept");
 
 const router = express.Router();
 
@@ -33,10 +35,8 @@ async function prepare(token) {
   if (found.error) return found;
   const { invite } = found;
   const [tree, inviter, roles, account] = await Promise.all([loadTree(), loadUser(invite.invitedBy), structure.structureRoles(), User.findOne({ email: invite.email }).lean()]);
-  if (!tree.practices.some((p) => p._id === invite.practiceId)) return { status: 410, error: "The practice you were invited to no longer exists." };
-  if (!inviter?.isActive || inv.inviteRefusal(inviter, invite, roles, tree)) {
-    return { status: 410, error: "Whoever invited you can no longer make this appointment. Ask someone in the practice to invite you again." };
-  }
+  const stale = staleReason(invite, { tree, inviter, roles });
+  if (stale) return stale;
   return { invite, tree, inviter, roles, account };
 }
 
@@ -71,30 +71,9 @@ router.post(
     const displayName = str(req.body?.displayName, 80, "Name");
 
     const user = account ?? (await findOrCreateByEmail(invite.email, displayName)).user;
-    const userId = String(user._id);
-    const { practiceId, groupId } = invite;
-    const actor = { user: inviter, tree };
-    const grantedBy = { $setOnInsert: { grantedBy: inviter.id, grantedAt: new Date() } };
-
-    let clash = null;
-    if (invite.kind === "manager") {
-      clash = await structure.replaceHolder(actor, roles.manager, { type: "practice", id: practiceId }, userId, { keepPrevious: invite.keepPrevious });
-    } else {
-      // Member and Lead both join the practice as a Practitioner (a Lead must already be in the practice).
-      if (!(await structure.isPracticeMember(userId, practiceId))) {
-        await RoleAssignment.updateOne({ userId, roleId: roles.practitioner._id, scopeType: "practice", scopeId: practiceId }, grantedBy, { upsert: true });
-      }
-      if (invite.kind === "lead") {
-        clash = await structure.replaceHolder(actor, roles.lead, { type: "group", id: groupId }, userId);
-      } else if (groupId && tree.groups.some((g) => g._id === groupId)) {
-        // Someone already in a group of this practice stays where they are.
-        await GroupMembership.updateOne({ practiceId, userId }, { $setOnInsert: { practiceId, groupId, userId, addedBy: inviter.id, addedAt: new Date() } }, { upsert: true });
-      }
-    }
+    const clash = await applyInvitation(invite, String(user._id), { tree, inviter, roles });
     if (clash) return bad(res, clash.error, clash.status);
-
-    await Invitation.updateOne({ _id: invite._id, status: "pending" }, { status: "accepted", acceptedBy: user._id, acceptedAt: new Date() });
-    res.json({ token: signToken(user._id), practiceId, username: user.username });
+    res.json({ token: signToken(user._id), practiceId: invite.practiceId, username: user.username });
   }),
 );
 

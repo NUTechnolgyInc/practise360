@@ -15,7 +15,7 @@ const structure = require("../lib/practice-structure");
 const { replaceHolder, structureRoles } = structure;
 const overviewRoutes = require("./practice-overview");
 const { inviteRoutes, listInvites, canSeeInvites } = require("./practice-invites");
-const { cancelPending } = require("../lib/invites");
+const { cancelPending, inviteRefusal } = require("../lib/invites");
 
 const router = express.Router();
 
@@ -102,6 +102,8 @@ function presentPractice(practice, tree, people, user, roles, { withMembers = fa
           // Running the group (its Lead, Manager, Practices Admin): overview, and taking members in or out of it.
           update: canUpdateGroup(user, g._id, tree),
           manageMembers: canManageGroupMembers(user, g, tree),
+          // Invite someone new by email straight into this group — the Manager, Practices Admin, and its Lead.
+          invite: !inviteRefusal(user, { kind: "member", practiceId: practice._id, groupId: g._id }, roles, tree),
         },
       };
     }),

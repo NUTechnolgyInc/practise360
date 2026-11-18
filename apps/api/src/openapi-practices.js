@@ -63,6 +63,7 @@ const schemas = {
           setLead: { type: "boolean" },
           update: { type: "boolean", description: "Edit the group's Overview (`practices.group.update`)" },
           manageMembers: { type: "boolean", description: "Take members into or out of this group (`practices.members.manage` at the practice, or `practices.group.update` here)" },
+          invite: { type: "boolean", description: "Invite someone new by email straight into this group (Manager, Practices Admin, or the group's Lead via `practices.group.update`)" },
         },
       },
     },
@@ -354,7 +355,7 @@ const paths = {
     parameters: [ID],
     post: op(
       "Invite someone who isn't on Practise360 yet",
-      "Emails a one-time link (valid 7 days). `kind`: `member` (joins as Practitioner, optionally into `groupId` — that needs `practices.members.manage`), `manager` (becomes the practice's Manager), `lead` (joins as Practitioner and leads `groupId`). The caller needs exactly what the direct appointment needs (escalation guard), checked again with the inviter's grants when the link is used. Refused with 409 when the email already has an account. A new invitation replaces an open one for the same email in this practice, and for the same Manager or Lead slot. `INVITE_EMAIL_DOMAINS` can limit which domains are allowed.",
+      "Emails a one-time link (valid 7 days). `kind`: `member` (joins as Practitioner, optionally into `groupId` — that needs `practices.members.manage`), `manager` (becomes the practice's Manager), `lead` (joins as Practitioner and leads `groupId`). The caller needs exactly what the direct appointment needs (escalation guard), checked again with the inviter's grants when the link is used — except that whoever runs a group (`practices.group.update` there, i.e. its Lead) may invite a `member` into that group if they hold every Practitioner permission at the practice. Refused with 409 when the email already has an account. A new invitation replaces an open one for the same email in this practice, and for the same Manager or Lead slot. `INVITE_EMAIL_DOMAINS` can limit which domains are allowed.",
       {
         requestBody: body(
           { type: "object", required: ["email"], properties: { email: { type: "string" }, kind: { type: "string", enum: ["member", "manager", "lead"], default: "member" }, groupId: { type: "string" }, keepPrevious: { type: "boolean", default: true, description: "manager: keep the replaced Manager as a Practitioner" } } },
@@ -368,7 +369,7 @@ const paths = {
     parameters: [ID],
     post: op(
       "Add or invite several people by email",
-      "Members only (as Practitioner), optionally all into `groupId` — that needs `practices.members.manage`. Up to 50 distinct addresses per call; `emails` is an array or a comma/semicolon/space-separated string. Refused with 403 when the caller couldn't add a member here at all. Otherwise every address gets the same checks as a single invite (valid, `INVITE_EMAIL_DOMAINS`, escalation guard) and its own result: `invited` (emailed a link — replaces an open invitation for that email here), `added` (already has an account, so added directly), `member` (already in the practice — nothing changes) or `refused` (with `reason`).",
+      "Members only (as Practitioner), optionally all into `groupId` — that needs `practices.members.manage`, or running the group (its Lead: invites only — an address that already has an account is `refused`, the Manager adds them). Up to 50 distinct addresses per call; `emails` is an array or a comma/semicolon/space-separated string. Refused with 403 when the caller couldn't add a member here at all. Otherwise every address gets the same checks as a single invite (valid, `INVITE_EMAIL_DOMAINS`, escalation guard) and its own result: `invited` (emailed a link — replaces an open invitation for that email here), `added` (already has an account, so added directly), `member` (already in the practice — nothing changes) or `refused` (with `reason`).",
       {
         requestBody: body(
           { type: "object", required: ["emails"], properties: { emails: { oneOf: [{ type: "array", items: { type: "string" }, maxItems: 50 }, { type: "string" }] }, groupId: { type: "string" } } },

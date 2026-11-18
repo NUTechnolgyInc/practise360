@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { PortalShell } from "@/components/auth/portal-shell";
@@ -9,6 +9,7 @@ import { Button, Card, CardHeader, EmptyState, useToast } from "@/components/ui"
 import { DetailsFields, validateDetails } from "@/components/contributions/details-fields";
 import { MarkdownEditor } from "@/components/contributions/markdown-editor";
 import { OwnerField } from "@/components/contributions/owner-field";
+import { invitedEmail } from "@/components/practices/person-select";
 import { useResource } from "@/hooks/use-resource";
 import { api } from "@/lib/api";
 
@@ -20,9 +21,9 @@ const SLUG = /^[a-z0-9-]+$/;
 function returnTo(params) {
   const practice = params.get("practice");
   const group = params.get("group");
-  if (!practice || !SLUG.test(practice)) return { href: "/practices/contributions", practice: "" };
-  if (group && SLUG.test(group)) return { href: `/practices/${practice}/groups/${group}?tab=contributions`, practice };
-  return { href: `/practices/${practice}?tab=contributions`, practice };
+  if (!practice || !SLUG.test(practice)) return { href: "/practices/contributions", practice: "", group: null };
+  if (group && SLUG.test(group)) return { href: `/practices/${practice}/groups/${group}?tab=contributions`, practice, group };
+  return { href: `/practices/${practice}?tab=contributions`, practice, group: null };
 }
 
 function NewContribution() {
@@ -35,11 +36,14 @@ function NewContribution() {
   const ownIn = data?.canCreateIn ?? [];
   const forIn = data?.canAddForIn ?? [];
   const practices = (data?.practices ?? []).filter((p) => ownIn.includes(p.id) || forIn.includes(p.id));
-  const [form, setForm] = useState({ title: "", practiceId: "", ownerId: "", type: "", customType: "", startDate: today(), dueDate: "", description: TEMPLATE });
+  const [form, setForm] = useState({ title: "", practiceId: "", ownerId: "", ownerGroupId: "", type: "", customType: "", startDate: today(), dueDate: "", description: TEMPLATE });
   const canAddFor = !!form.practiceId && forIn.includes(form.practiceId);
   const forSomeone = canAddFor && !!form.ownerId;
+  // ownerId holds either a member's id or an invitation picked in the Owner field (someone new, by email).
+  const ownerEmail = forSomeone ? invitedEmail(form.ownerId) : "";
   const [errors, setErrors] = useState({});
   const [busy, setBusy] = useState(false);
+  const setOwnerGroup = useCallback((ownerGroupId) => setForm((f) => ({ ...f, ownerGroupId })), []);
 
   useEffect(() => {
     if (form.practiceId) return;
@@ -56,8 +60,13 @@ function NewContribution() {
     setBusy(true);
     try {
       const description = form.description.trim() === TEMPLATE.trim() ? "" : form.description;
-      const created = await api("/contributions", { method: "POST", body: { ...form, ownerId: forSomeone ? form.ownerId : undefined, description } });
-      toast(forSomeone ? `Added ${created.title} for ${created.owner.displayName}` : `Started ${created.title}`);
+      const { ownerGroupId, ...fields } = form;
+      const owner = ownerEmail ? { ownerEmail, groupId: ownerGroupId || undefined } : { ownerId: forSomeone ? form.ownerId : undefined };
+      const { invite, ...created } = await api("/contributions", { method: "POST", body: { ...fields, ...owner, description } });
+      if (!forSomeone) toast(`Started ${created.title}`);
+      else if (!invite) toast(`Added ${created.title} for ${created.owner.displayName}`);
+      // No join link to pass on: signing in with that email gives them access (and the email, when mail is set up).
+      else toast(`Added ${created.title} for ${invite.email} — they get access when they sign in with that email`);
       router.push(`/practices/contributions/${created.id}`);
     } catch (err) {
       toast(err.message, "error");
@@ -78,10 +87,20 @@ function NewContribution() {
       <form onSubmit={submit} className="space-y-6" noValidate>
         <Card>
           <CardHeader title="Details" />
-          <DetailsFields value={form} onChange={(v) => setForm(v.practiceId === form.practiceId ? v : { ...v, ownerId: "" })} errors={errors} practices={practices} />
+          <DetailsFields value={form} onChange={(v) => setForm(v.practiceId === form.practiceId ? v : { ...v, ownerId: "", ownerGroupId: "" })} errors={errors} practices={practices} />
           {canAddFor && (
             <div className="mt-4 sm:w-1/2 sm:pr-2">
-              <OwnerField key={form.practiceId} practiceId={form.practiceId} canOwn={ownIn.includes(form.practiceId)} value={form.ownerId} onChange={(ownerId) => setForm((f) => ({ ...f, ownerId }))} error={errors.ownerId} />
+              <OwnerField
+                key={form.practiceId}
+                practiceId={form.practiceId}
+                canOwn={ownIn.includes(form.practiceId)}
+                value={form.ownerId}
+                onChange={(ownerId) => setForm((f) => ({ ...f, ownerId }))}
+                groupId={form.ownerGroupId}
+                onGroupChange={setOwnerGroup}
+                preferGroup={back.practice === form.practiceId ? back.group : null}
+                error={errors.ownerId}
+              />
             </div>
           )}
         </Card>
@@ -92,7 +111,7 @@ function NewContribution() {
         <div className="flex justify-end gap-2">
           <Button variant="ghost" onClick={() => router.push(back.href)}>Cancel</Button>
           <Button type="submit" disabled={busy}>
-            {busy && <Loader2 className="animate-spin" />} {forSomeone ? "Add contribution" : "Start contribution"}
+            {busy && <Loader2 className="animate-spin" />} {ownerEmail ? "Add and invite" : forSomeone ? "Add contribution" : "Start contribution"}
           </Button>
         </div>
       </form>

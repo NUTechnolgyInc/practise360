@@ -2,8 +2,8 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const { PRACTICES, SYSTEM_ROLES } = require("../src/rbac/catalog");
-const { actionsFor, submissionProblems, nextStatus, viewablePractices, isOverdue, canAddFor, addForPractices, addedByOf } = require("../src/rbac/contribution-access");
-const { FULLSTACK, DEVOPS, treeWith } = require("./fixtures");
+const { actionsFor, submissionProblems, nextStatus, viewablePractices, isOverdue, canAddFor, canAddForNew, addForPractices, addedByOf } = require("../src/rbac/contribution-access");
+const { FULLSTACK, DEVOPS, QA_AUTO, treeWith } = require("./fixtures");
 
 const roles = Object.fromEntries(SYSTEM_ROLES.map((r) => [r._id, r]));
 const userWith = (id, ...assignments) => ({
@@ -84,6 +84,13 @@ test("adding for someone else: Lead for their group only, Manager for the practi
   assert.ok(!canAddFor(manager, "qa", "qa", TREE), "Manager → not another practice");
   assert.ok(canAddFor(admin, "qa", "qa", TREE));
   for (const u of [owner, bystander]) assert.ok(!canAddFor(u, DE, "helper", TREE), `${u.id} can't add for others`);
+  // Someone new (invited by email) is checked where they'll sit.
+  assert.ok(canAddForNew(lead, DE, FULLSTACK, TREE), "Lead → newcomer in own group");
+  assert.ok(!canAddForNew(lead, DE, null, TREE), "Lead → not a newcomer outside any group");
+  assert.ok(!canAddForNew(lead, DE, DEVOPS, TREE), "Lead → not into another group");
+  assert.ok(canAddForNew(manager, DE, null, TREE) && canAddForNew(manager, DE, DEVOPS, TREE));
+  assert.ok(!canAddForNew(manager, DE, QA_AUTO, TREE), "the group must be in the practice");
+  assert.ok(!canAddForNew(owner, DE, FULLSTACK, TREE));
   assert.deepEqual(addForPractices(lead, TREE), [DE]);
   assert.deepEqual(addForPractices(owner, TREE), []);
   assert.equal(addForPractices(admin, TREE).length, PRACTICES.length);

@@ -62,6 +62,17 @@ function actionsFor(user, c, tree) {
  */
 const canAddFor = (user, practiceId, memberId, tree) => can(user, PERM.MANAGE, memberScope(tree, practiceId, memberId), undefined, tree);
 
+/**
+ * May `user` add a contribution for someone who isn't in the practice yet (invited by email), who will sit in
+ * `groupId` (null = the practice, no group)? Same reach, checked where they'll land — so a Lead only for their own
+ * group. Inviting them is a separate check (inviteRefusal in lib/invites.js); the route needs both.
+ */
+const canAddForNew = (user, practiceId, groupId, tree) => {
+  const t = treeOf(tree);
+  if (groupId && !t.groups.some((g) => g._id === groupId && g.practiceId === practiceId)) return false;
+  return can(user, PERM.MANAGE, groupId ? { type: "group", id: groupId } : { type: "practice", id: practiceId }, undefined, tree);
+};
+
 /** Practice ids where the user may add a contribution for someone else (manage at the practice or one of its groups). */
 const addForPractices = (user, tree) => treeOf(tree).practices.filter((p) => canWithin(user, PERM.MANAGE, p._id, tree)).map((p) => p._id);
 
@@ -95,4 +106,4 @@ function nextStatus(stage, decision) {
 
 const isOverdue = (c, now = new Date()) => !CLOSED.includes(c.status) && c.status !== "lead_review" && c.status !== "manager_review" && new Date(c.dueDate) < now;
 
-module.exports = { PERM, EDITABLE, CLOSED, actionsFor, viewablePractices, creatablePractices, addForPractices, canAddFor, addedByOf, submissionProblems, nextStatus, isParticipant, isOverdue, sameId };
+module.exports = { PERM, EDITABLE, CLOSED, actionsFor, viewablePractices, creatablePractices, addForPractices, canAddFor, canAddForNew, addedByOf, submissionProblems, nextStatus, isParticipant, isOverdue, sameId };

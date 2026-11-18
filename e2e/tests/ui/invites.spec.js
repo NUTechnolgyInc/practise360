@@ -1,7 +1,7 @@
 // INV-UI — inviting someone by email from a person picker, and joining from the link (docs/rbac.md §4 "Invitations").
 const { test, expect } = require("../../support/fixtures");
 const { removeInvited } = require("../../support/db");
-const { card } = require("../../support/ui");
+const { card, toast } = require("../../support/ui");
 
 const groupSection = (page, name) => page.getByRole("region", { name });
 const used = [];
@@ -13,47 +13,38 @@ const newEmail = (label) => {
 
 test.afterAll(async () => removeInvited(used));
 
-test("[INV-UI-01] Manager invites a new member by email; they join from the link and land in the practice", async ({ page, loginAs, browser }) => {
+test("[INV-UI-01] Manager invites a new member by email; signing in with that email lands them in the practice", async ({ page, loginAs, browser }) => {
   const email = newEmail("ivy");
   await loginAs("de.manager");
   await page.goto("/practices/digital-engineering?tab=groups");
   await page.getByRole("button", { name: "Add member" }).click();
   const dialog = page.getByRole("dialog", { name: "Add people to Digital Engineering" });
   await dialog.getByRole("searchbox").fill(email);
-  await dialog.getByRole("radio", { name: `Invite ${email}` }).check();
+  await dialog.getByRole("checkbox", { name: `Invite ${email}` }).check();
   await dialog.getByLabel("Group").selectOption({ label: "Mobile App" });
-  await dialog.getByRole("button", { name: "Send invite" }).click();
+  await dialog.getByRole("button", { name: "Add 1 person" }).click();
 
-  // No mail server on the e2e stack, so the join link is handed to the inviter.
-  const sent = page.getByRole("dialog", { name: `Invitation ready for ${email}` });
-  const link = await sent.getByLabel("Join link").inputValue();
-  expect(link).toMatch(/\/invite\/[\w-]{40,}$/);
-  await sent.getByRole("button", { name: "Done" }).click();
+  // No join link is handed out any more (owner 2026-11-18): signing in with the email is enough.
+  await expect(toast(page, "Invited 1 to Digital Engineering")).toBeVisible();
   await expect(card(page, "Pending invitations")).toContainText(email);
   await expect(card(page, "Pending invitations")).toContainText("a member of Digital Engineering (Mobile App)");
 
-  // The invitee, in their own browser with no session.
+  // The invitee, in their own browser with no session. No Google on the e2e stack, so the dev login creates the account.
   const context = await browser.newContext();
   try {
     const invitee = await context.newPage();
-    await invitee.goto(link);
-    await expect(invitee.getByRole("heading", { name: "You're invited" })).toBeVisible();
-    await expect(invitee.getByText("Morgan Reyes invited you")).toBeVisible();
-    await expect(invitee.getByLabel("Email")).toHaveValue(email);
-    await invitee.getByLabel("Your name").fill("Ivy Tester");
-    await invitee.getByRole("button", { name: "Join Practise360" }).click();
-    await expect(invitee).toHaveURL(/\/practices\/digital-engineering$/);
+    await invitee.goto("/login");
+    await invitee.getByLabel("Username or email").fill(email);
+    await invitee.getByLabel("Password").fill("password");
+    await invitee.getByRole("button", { name: "Sign in" }).click();
+    await invitee.goto("/practices/digital-engineering");
     await expect(invitee.getByRole("heading", { level: 1, name: "Digital Engineering" })).toBeVisible();
-
-    // The link is spent.
-    await invitee.goto(link);
-    await expect(invitee.getByText("This invitation has already been used")).toBeVisible();
   } finally {
     await context.close();
   }
 
   await page.reload();
-  await expect(groupSection(page, "Mobile App")).toContainText("Ivy Tester");
+  await expect(groupSection(page, "Mobile App")).toContainText("Ivy"); // name derived from the email: "Ivy …"
   await expect(page.getByRole("heading", { name: "Pending invitations" })).toHaveCount(0);
 });
 
