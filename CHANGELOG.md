@@ -8,6 +8,7 @@ Add entries under **Unreleased** in the same PR as the change, grouped as Added 
 ## [Unreleased]
 
 ### Added
+- **Copy permissions when creating a role**: *New custom role* has a **Copy permissions from** field listing the system roles and the custom roles you can see. Pick one and its permissions are ticked for you to adjust before saving. Only permissions allowed in a custom role and held by you in that practice are copied; the hint says how many were left out. Changing the practice clears the copy.
 - **Audit log** (`/audit-log`, Super Admin only, in the sidebar): every change and sign-in across Practise360 — roles granted and revoked, roles edited, practices, groups, members, invitations, contributions, certifications, usage reports, and password / Google / invitation sign-ins — including attempts that were refused or failed, with the error shown. Each row shows when, who, what (with people, practices, groups, roles, contributions and certifications by name), the outcome, and the IP address. Filter by text, area, outcome, person and date range; 50 per page, newest first. Passwords, tokens and file contents are never recorded, and entries can't be edited or deleted. New permission `platform.audit.view` — run `npm run sync-roles -w api` on existing databases. API: `GET /audit-log`, documented in Swagger.
 
 ### Changed

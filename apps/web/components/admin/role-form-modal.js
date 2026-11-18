@@ -9,8 +9,10 @@ import { api } from "@/lib/api";
  * Create/edit a custom role, or edit a system role (Super Admin only).
  * Custom: only permissions the actor holds in that practice are offered. System: the whole catalog, minus
  * platform.* on non-platform roles. The API re-checks both.
+ * A new custom role can start from another role's permissions (`roles`): only the ones that can go into it are
+ * copied, and they stay editable.
  */
-export function RoleFormModal({ role, catalog, practices, onClose, onSaved }) {
+export function RoleFormModal({ role, roles = [], catalog, practices, onClose, onSaved }) {
   const isSystem = !!role?.isSystem;
   const toast = useToast();
   const { can } = useSession();
@@ -18,12 +20,24 @@ export function RoleFormModal({ role, catalog, practices, onClose, onSaved }) {
   const [description, setDescription] = useState(role?.description ?? "");
   const [practiceId, setPracticeId] = useState(role?.scopeId ?? practices[0]?.id ?? "");
   const [perms, setPerms] = useState(new Set(role?.permissions ?? []));
+  const [copyFrom, setCopyFrom] = useState("");
   const [busy, setBusy] = useState(false);
 
   const scope = { type: "practice", id: practiceId };
   const offered = isSystem
     ? catalog.permissions.filter((p) => role.scopeType === "platform" || !p.key.startsWith("platform."))
     : catalog.permissions.filter((p) => catalog.customRolePermissions.includes(p.key) && can(p.key, scope));
+  const practiceName = new Map(practices.map((p) => [p.id, p.name]));
+  const source = roles.find((r) => r.id === copyFrom);
+  // `*` (Super Admin) means everything, so it copies every permission on offer.
+  const copyable = (from, list) => (from.permissions.includes("*") ? list.map((p) => p.key) : list.filter((p) => from.permissions.includes(p.key)).map((p) => p.key));
+  const copied = source ? copyable(source, offered).length : 0;
+  const skipped = source && !source.permissions.includes("*") ? source.permissions.length - copied : 0;
+  const copyPermissions = (id) => {
+    setCopyFrom(id);
+    const from = roles.find((r) => r.id === id);
+    if (from) setPerms(new Set(copyable(from, offered)));
+  };
   const toggle = (key) => setPerms((prev) => {
     const next = new Set(prev);
     next.has(key) ? next.delete(key) : next.add(key);
@@ -71,9 +85,34 @@ export function RoleFormModal({ role, catalog, practices, onClose, onSaved }) {
         </Field>
         {!isSystem && (
           <Field id="role-practice" label="Practice" hint={role ? "A role stays in the practice it was created in." : undefined}>
-            <Select id="role-practice" value={practiceId} disabled={!!role} onChange={(e) => { setPracticeId(e.target.value); setPerms(new Set()); }}>
+            <Select id="role-practice" value={practiceId} disabled={!!role} onChange={(e) => { setPracticeId(e.target.value); setPerms(new Set()); setCopyFrom(""); }}>
               {practices.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
             </Select>
+          </Field>
+        )}
+        {!role && roles.length > 0 && (
+          <Field
+            id="role-copy"
+            label="Copy permissions from"
+            hint={
+              source
+                ? `Copied ${copied} permission${copied === 1 ? "" : "s"} from ${source.name} — adjust them below.${skipped ? ` ${skipped} left out: not allowed in a custom role, or you don't hold them in this practice.` : ""}`
+                : "Optional — start from an existing role's permissions, then edit them."
+            }
+          >
+            {(p) => (
+              <Select {...p} value={copyFrom} onChange={(e) => copyPermissions(e.target.value)}>
+                <option value="">Start from scratch</option>
+                <optgroup label="System roles">
+                  {roles.filter((r) => r.isSystem).map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
+                </optgroup>
+                {roles.some((r) => !r.isSystem) && (
+                  <optgroup label="Custom roles">
+                    {roles.filter((r) => !r.isSystem).map((r) => <option key={r.id} value={r.id}>{r.name} · {practiceName.get(r.scopeId) ?? r.scopeId}</option>)}
+                  </optgroup>
+                )}
+              </Select>
+            )}
           </Field>
         )}
         <fieldset>

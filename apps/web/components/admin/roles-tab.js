@@ -70,7 +70,7 @@ export function RolesTab({ roles, catalog, managePractices, onChanged }) {
       </div>
 
       {editing && (
-        <RoleFormModal role={editing.id ? editing : null} catalog={catalog} practices={managePractices} onClose={() => setEditing(null)} onSaved={onChanged} />
+        <RoleFormModal role={editing.id ? editing : null} roles={roles} catalog={catalog} practices={managePractices} onClose={() => setEditing(null)} onSaved={onChanged} />
       )}
       <Modal
         open={!!deleting}
