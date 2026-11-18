@@ -41,6 +41,7 @@ platform                         (global)
 | `roles` | _id, name, scopeType, scopeId, isSystem, assignableFrom, **permissions[]** | Permissions are embedded (no join collection). `scopeId` set on app roles and on custom roles (owning practice) |
 | `role_assignments` | userId, roleId, scopeType, scopeId, grantedBy, grantedAt | Unique on (userId, roleId, scopeType, scopeId) |
 | `audit_logs` | at, actorId, actorName, actorUsername, action, label, category, method, route, params, details, resultId, status, outcome, error, ip, userAgent | Append-only record of every write request and sign-in (§4 "Audit log") |
+| `cache_versions` | _id (`rbac-tree`), token | Change stamp for the API's in-memory copy of `apps`, `practices`, `practice_groups` and `group_memberships`. Every write to those four (model hooks) sets a new token; every request reads it and reloads the copy when it moved, so changes still apply at once on every instance. A write that skips the models (raw driver, mongosh) must set a new token too. Grants (`role_assignments` + `roles`) are not cached |
 
 `scopeType` ∈ `platform | app | practice | group`. A user can hold several assignments (e.g. Practitioner in DE + Lead of DE Fullstack, Practitioner in AI).
 An assignment whose scope type doesn't match its role's (left over from a role changing level) grants nothing.

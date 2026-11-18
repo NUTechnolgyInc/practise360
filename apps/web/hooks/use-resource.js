@@ -1,30 +1,35 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { api } from "@/lib/api";
+import { useCallback, useEffect, useRef, useSyncExternalStore } from "react";
+import { EMPTY_SNAPSHOT, getSnapshot, mutate, revalidate, subscribe } from "@/lib/resource-cache";
 
-/** Loads `path` (null = skip) and exposes reload/setData — the shared data-loading hook for list and detail screens. */
+/**
+ * Loads `path` (null = skip) and exposes reload/setData — the shared data-loading hook for list and detail screens.
+ * Backed by lib/resource-cache: a path seen before renders its last response at once and refreshes in the
+ * background, so `loading` is only true when there is nothing to show yet.
+ */
 export function useResource(path) {
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(!!path);
-  const [error, setError] = useState("");
-
-  const reload = useCallback(async () => {
-    if (!path) return;
-    setLoading(true);
-    try {
-      setData(await api(path));
-      setError("");
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  }, [path]);
+  const subscribeToPath = useCallback((fn) => subscribe(path, fn), [path]);
+  // Server render and hydration see the empty snapshot, so cached data can't cause a hydration mismatch.
+  const snap = useSyncExternalStore(subscribeToPath, () => getSnapshot(path), () => EMPTY_SNAPSHOT);
 
   useEffect(() => {
-    reload();
-  }, [reload]);
+    if (path) revalidate(path);
+  }, [path]);
 
-  return { data, setData, loading, error, reload };
+  const reload = useCallback(() => (path ? revalidate(path, { force: true }) : Promise.resolve()), [path]);
+  const setData = useCallback((next) => path && mutate(path, next), [path]);
+
+  // While a new path loads, keep showing the previous path's data (filters, paging) — as before the cache.
+  const last = useRef(null);
+  if (snap.data !== undefined) last.current = snap.data;
+  const hasData = snap.data !== undefined;
+
+  return {
+    data: hasData ? snap.data : last.current,
+    setData,
+    loading: !!path && !hasData && (snap.fetching || !snap.settled),
+    error: snap.error ?? "",
+    reload,
+  };
 }

@@ -1,34 +1,32 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { api } from "@/lib/api";
+import { useCallback } from "react";
+import { useResource } from "./use-resource";
 
 /** Everything the Access control portal needs, reloaded together after each mutation so counts and guards stay in sync. */
 export function useRbacData() {
-  const [data, setData] = useState({ users: [], roles: [], catalog: null, assignable: [] });
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const users = useResource("/rbac/users");
+  const roles = useResource("/rbac/roles");
+  const catalog = useResource("/rbac/catalog");
+  const assignable = useResource("/rbac/assignable");
+  const parts = [users, roles, catalog, assignable];
 
-  const reload = useCallback(async () => {
-    try {
-      const [users, roles, catalog, assignable] = await Promise.all([
-        api("/rbac/users"),
-        api("/rbac/roles"),
-        api("/rbac/catalog"),
-        api("/rbac/assignable"),
-      ]);
-      setData({ users, roles, catalog, assignable });
-      setError("");
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const reloadUsers = users.reload;
+  const reloadRoles = roles.reload;
+  const reloadCatalog = catalog.reload;
+  const reloadAssignable = assignable.reload;
+  const reload = useCallback(
+    () => Promise.all([reloadUsers(), reloadRoles(), reloadCatalog(), reloadAssignable()]),
+    [reloadUsers, reloadRoles, reloadCatalog, reloadAssignable],
+  );
 
-  useEffect(() => {
-    reload();
-  }, [reload]);
-
-  return { ...data, loading, error, reload };
+  return {
+    users: users.data ?? [],
+    roles: roles.data ?? [],
+    catalog: catalog.data,
+    assignable: assignable.data ?? [],
+    loading: parts.some((p) => p.loading),
+    error: parts.find((p) => p.error)?.error ?? "",
+    reload,
+  };
 }

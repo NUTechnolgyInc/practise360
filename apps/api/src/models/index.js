@@ -3,6 +3,30 @@ const mongoose = require("mongoose");
 const { Schema, model } = mongoose;
 const SCOPE_TYPES = ["platform", "app", "practice", "group"];
 
+// ---------- RBAC tree change stamp ----------
+// The API caches the RBAC tree (apps, practices, groups, memberships) in memory and re-reads it only when this
+// stamp changes. Each Vercel instance has its own memory, so the stamp lives in the DB where every instance sees it.
+const CacheVersion = model("CacheVersion", new Schema({ _id: String, token: String }, { versionKey: false }), "cache_versions");
+const TREE_VERSION_ID = "rbac-tree";
+const treeChangeListeners = new Set();
+const newToken = () => new mongoose.Types.ObjectId().toString();
+
+/** Marks the tree as changed: this instance drops its copy at once, the others on their next request. */
+async function bumpTreeVersion() {
+  for (const fn of treeChangeListeners) fn();
+  await CacheVersion.updateOne({ _id: TREE_VERSION_ID }, { $set: { token: newToken() } }, { upsert: true });
+}
+
+// Hooks on the models themselves, so a new write path can't forget to invalidate — an archive, a new group or a
+// move between groups must reach every check at once (docs/rbac.md). Post hooks are awaited, so the stamp has moved
+// before the write's own response goes out.
+const TREE_QUERY_WRITES = ["updateOne", "updateMany", "deleteOne", "deleteMany", "findOneAndUpdate", "findOneAndDelete", "findOneAndReplace", "replaceOne"];
+function treeChangePlugin(schema) {
+  schema.post(TREE_QUERY_WRITES, { document: false, query: true }, bumpTreeVersion);
+  schema.post(["save", "deleteOne"], { document: true, query: false }, bumpTreeVersion);
+  schema.post(["insertMany", "bulkWrite"], bumpTreeVersion);
+}
+
 // Users carry no password: auth (dev login today, SSO later) only resolves a userId.
 const userSchema = new Schema(
   {
@@ -52,39 +76,38 @@ const invitationSchema = new Schema(
 invitationSchema.index({ email: 1, status: 1 });
 const Invitation = model("Invitation", invitationSchema, "invitations");
 
-const App = model("App", new Schema({ _id: String, name: String, permPrefix: String }));
+const appSchema = new Schema({ _id: String, name: String, permPrefix: String });
+appSchema.plugin(treeChangePlugin);
+const App = model("App", appSchema);
 
-const Practice = model(
-  "Practice",
-  new Schema(
-    {
-      _id: String,
-      appId: { type: String, default: "practices" },
-      name: { type: String, required: true, trim: true, maxlength: 80 },
-      description: { type: String, trim: true, maxlength: 500, default: "" },
-      isArchived: { type: Boolean, default: false },
-      createdBy: { type: Schema.Types.ObjectId, ref: "User" },
-    },
-    { timestamps: true },
-  ),
+const practiceSchema = new Schema(
+  {
+    _id: String,
+    appId: { type: String, default: "practices" },
+    name: { type: String, required: true, trim: true, maxlength: 80 },
+    description: { type: String, trim: true, maxlength: 500, default: "" },
+    isArchived: { type: Boolean, default: false },
+    createdBy: { type: Schema.Types.ObjectId, ref: "User" },
+  },
+  { timestamps: true },
 );
+practiceSchema.plugin(treeChangePlugin);
+const Practice = model("Practice", practiceSchema);
 
 // Groups inside a practice (docs/rbac.md §4 "Practices and groups"). The id is a slug fixed at creation, because
 // it's the scopeId of the Lead's role assignment — renaming only changes `name`.
-const Group = model(
-  "Group",
-  new Schema(
-    {
-      _id: String,
-      practiceId: { type: String, required: true, index: true },
-      name: { type: String, required: true, trim: true, maxlength: 80 },
-      description: { type: String, trim: true, maxlength: 500, default: "" },
-      createdBy: { type: Schema.Types.ObjectId, ref: "User" },
-    },
-    { timestamps: true },
-  ),
-  "practice_groups",
+const groupSchema = new Schema(
+  {
+    _id: String,
+    practiceId: { type: String, required: true, index: true },
+    name: { type: String, required: true, trim: true, maxlength: 80 },
+    description: { type: String, trim: true, maxlength: 500, default: "" },
+    createdBy: { type: Schema.Types.ObjectId, ref: "User" },
+  },
+  { timestamps: true },
 );
+groupSchema.plugin(treeChangePlugin);
+const Group = model("Group", groupSchema, "practice_groups");
 
 // Which group a practice member sits in — at most one per practice, hence the unique (practiceId, userId).
 // Kept apart from role assignments: membership decides whose Lead reviews someone's work, it grants nothing itself.
@@ -96,6 +119,7 @@ const groupMembershipSchema = new Schema({
   addedAt: { type: Date, default: Date.now },
 });
 groupMembershipSchema.index({ practiceId: 1, userId: 1 }, { unique: true });
+groupMembershipSchema.plugin(treeChangePlugin);
 const GroupMembership = model("GroupMembership", groupMembershipSchema, "group_memberships");
 
 // A practice's Overview page: key information (Markdown) its Manager or Practices Admin keeps up to date.
@@ -251,6 +275,10 @@ const contributionSchema = new Schema(
   },
   { timestamps: true },
 );
+// Lists sort by updatedAt inside a practice; a person's profile looks up what they own or worked on.
+contributionSchema.index({ practiceId: 1, updatedAt: -1 });
+contributionSchema.index({ ownerId: 1, updatedAt: -1 });
+contributionSchema.index({ contributorIds: 1 });
 const Contribution = model("Contribution", contributionSchema, "contributions");
 
 // Attachments (≤ 4 MB, Vercel's body cap) — bytes are select:false so metadata lists stay light.
@@ -345,6 +373,9 @@ const certPlanSchema = new Schema(
   },
   { timestamps: true },
 );
+// Plan lists are "mine or my team's practices", newest first.
+certPlanSchema.index({ practiceId: 1, updatedAt: -1 });
+certPlanSchema.index({ ownerId: 1, updatedAt: -1 });
 const CertPlan = model("CertPlan", certPlanSchema, "cert_plans");
 
 // Certificates and receipts (PDF or image, ≤ 4 MB) — bytes are select:false so metadata lists stay light.
@@ -398,6 +429,10 @@ const AuditLog = model("AuditLog", auditLogSchema, "audit_logs");
 
 module.exports = {
   AuditLog,
+  CacheVersion,
+  TREE_VERSION_ID,
+  bumpTreeVersion,
+  treeChangeListeners,
   AUDIT_OUTCOMES,
   CertCatalogItem,
   CertPlan,

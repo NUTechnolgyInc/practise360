@@ -3,6 +3,13 @@
 const mongoose = require("mongoose");
 const { E2E } = require("../env");
 
+/**
+ * These raw writes skip the API's model hooks, so set a new RBAC tree stamp by hand — otherwise the running API keeps
+ * serving its cached practices/groups/memberships (docs/rbac.md §2, `cache_versions`).
+ */
+const bumpTreeStamp = (conn) =>
+  conn.collection("cache_versions").updateOne({ _id: "rbac-tree" }, { $set: { token: new mongoose.Types.ObjectId().toString() } }, { upsert: true });
+
 /** Removes a practice with its groups, group memberships, Overviews (practice and groups) and files, and every role assignment on it or its groups. */
 async function removePractice(practiceId) {
   if (!new URL(E2E.mongoUri).pathname.endsWith("_e2e")) throw new Error("Refusing to touch a non-e2e database");
@@ -18,6 +25,7 @@ async function removePractice(practiceId) {
     await conn.collection("group_overviews").deleteMany({ _id: { $in: groups.map((g) => g._id) } });
     await conn.collection("practice_files").deleteMany({ practiceId });
     await conn.collection("practices").deleteOne({ _id: practiceId });
+    await bumpTreeStamp(conn);
   } finally {
     await conn.close();
   }
@@ -37,6 +45,7 @@ async function removeInvited(emails) {
     await conn.collection("group_memberships").deleteMany({ userId: { $in: ids } });
     await conn.collection("users").deleteMany({ _id: { $in: ids } });
     await conn.collection("invitations").deleteMany({ email: { $in: emails } });
+    await bumpTreeStamp(conn);
   } finally {
     await conn.close();
   }

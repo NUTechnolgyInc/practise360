@@ -18,6 +18,17 @@ app.use(cors({ origin: origins }));
 const isFileUpload = (req) => /\/files(\?|$)/.test(req.url);
 app.use(express.json({ limit: "1mb", type: (req) => !isFileUpload(req) && /json/.test(req.headers["content-type"] || "") }));
 
+// Reads may sit in the browser's private cache but are revalidated every time: Express's ETag turns an unchanged
+// response into a bodyless 304. Vary keeps one person's copy from answering another's request in a shared browser.
+// Routes that must never be stored (file downloads) set their own no-store after this.
+app.use((req, res, next) => {
+  if (req.method === "GET") {
+    res.set("Cache-Control", "private, no-cache");
+    res.vary("Authorization");
+  }
+  next();
+});
+
 // Before every router: each write request and sign-in is recorded, including the refused ones.
 app.use(auditTrail);
 
