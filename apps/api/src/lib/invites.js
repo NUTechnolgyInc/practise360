@@ -1,9 +1,10 @@
 // Invitations into a practice (docs/rbac.md §4 "Invitations"). An invitation is a deferred grant: the inviter must be
 // able to make the same appointment directly today, and that's checked again — with the inviter's grants at that
-// moment — when the link is used, so losing the right to appoint also voids the invitations you sent.
+// moment — when the link is used, so losing the right to appoint also voids the invitations you sent. One exception:
+// a group's Lead may invite new members into their group (groupRunnerMayInvite).
 const crypto = require("crypto");
 const { Invitation } = require("../models");
-const { checkGrant } = require("../rbac/engine");
+const { can, checkGrant, holdsExactly, treeOf } = require("../rbac/engine");
 const { canMoveMember } = require("../rbac/group-access");
 const { sendMail } = require("./mailer");
 const { inviteEmail } = require("./invite-email");
@@ -67,7 +68,7 @@ function grantsFor(invite, roles) {
 }
 
 /** Why `actor` couldn't make this appointment directly — the same guard as the Practices screen — or null if they can. */
-function inviteRefusal(actor, invite, roles, tree) {
+function appointRefusal(actor, invite, roles, tree) {
   for (const [role, scope] of grantsFor(invite, roles)) {
     if (!role) return "That role doesn't exist";
     const verdict = checkGrant(actor, role, scope, tree);
@@ -78,6 +79,27 @@ function inviteRefusal(actor, invite, roles, tree) {
     return "Missing permission practices.members.manage";
   }
   return null;
+}
+
+/**
+ * Whoever runs a group (`practices.group.update` there — its Lead) may invite new people into it as Practitioner,
+ * though they can't appoint Practitioners directly (owner's decision 2026-11-18). The guard's second half still
+ * applies: they must hold every Practitioner permission at the practice. Members only — never Manager or Lead.
+ */
+function groupRunnerMayInvite(actor, invite, roles, tree) {
+  if (invite.kind !== "member" || !invite.groupId || !roles.practitioner) return false;
+  if (!treeOf(tree).groups.some((g) => g._id === invite.groupId && g.practiceId === invite.practiceId)) return false;
+  if (!can(actor, "practices.group.update", groupScope(invite.groupId), undefined, tree)) return false;
+  return roles.practitioner.permissions.every((p) => holdsExactly(actor, p, practiceScope(invite.practiceId), tree));
+}
+
+/**
+ * Why `actor` couldn't send this invitation, or null if they can: the direct appointment's guard, or — for a member
+ * invited into a group — running that group. Re-checked on accept, so losing the right voids the link.
+ */
+function inviteRefusal(actor, invite, roles, tree) {
+  const refusal = appointRefusal(actor, invite, roles, tree);
+  return refusal && groupRunnerMayInvite(actor, invite, roles, tree) ? null : refusal;
 }
 
 /** What the invitee will be, in words: "Manager of Digital Engineering", "Lead of Fullstack in Digital Engineering"… */
@@ -129,6 +151,10 @@ function planBulkInvite(emails, { actor, practiceId, practiceName, groupId = nul
     if (!user) return { email, action: "invite" };
     if (!user.isActive) return { email, action: "refused", reason: "Belongs to a deactivated account", user };
     if (memberIds.has(String(user._id))) return { email, action: "member", reason: `${user.displayName} is already in ${practiceName ?? "this practice"}`, user };
+    // A Lead may invite but not appoint directly, and an existing account can't be invited — the Manager adds them.
+    if (appointRefusal(actor, { email, kind: "member", practiceId, groupId }, roles, tree)) {
+      return { email, action: "refused", reason: `${user.displayName} already has an account — ask the Practice Manager to add them to ${practiceName ?? "this practice"}`, user };
+    }
     // Already on Practise360: an invitation would only be refused ("pick them instead"), so add them directly — the same
     // appointment, checked by the same guard above.
     return { email, action: "add", user };
@@ -151,6 +177,7 @@ module.exports = {
   usernameBase,
   displayNameFromEmail,
   grantsFor,
+  appointRefusal,
   inviteRefusal,
   roleText,
   isExpired,

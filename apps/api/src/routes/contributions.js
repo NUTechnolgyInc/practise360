@@ -2,14 +2,20 @@
 // (src/rbac/contribution-access.js) — the same rules the web app uses to hide buttons.
 const express = require("express");
 const mongoose = require("mongoose");
-const { Contribution, ContributionFile, CONTRIBUTION_TYPES, CONTRIBUTION_STATUSES } = require("../models");
+const { Contribution, ContributionFile, GroupMembership, User, CONTRIBUTION_TYPES, CONTRIBUTION_STATUSES } = require("../models");
 const { requireAnyScope } = require("../middleware/auth");
 const { can } = require("../rbac/engine");
+const { loadTree } = require("../rbac/load");
 const access = require("../rbac/contribution-access");
 const { bad, wrap, rawBody, str, parseDate, usersById, person, practiceMembers: membersWhere, sendStoredFile, safeFileName } = require("../lib/http");
 const { contributionSummary: summary } = require("../lib/summaries");
+const { addPracticeMember, isPracticeMember, structureRoles } = require("../lib/practice-structure");
+const { findOrCreateByEmail } = require("../lib/accounts");
+const { isGoogleEnabled } = require("../lib/google-auth");
+const inv = require("../lib/invites");
+const { issueInvite, linkForInviter } = require("./practice-invites");
 
-const { PERM, actionsFor, viewablePractices, creatablePractices, addForPractices, canAddFor, submissionProblems, nextStatus, sameId } = access;
+const { PERM, actionsFor, viewablePractices, creatablePractices, addForPractices, canAddFor, canAddForNew, submissionProblems, nextStatus, sameId } = access;
 const router = express.Router();
 
 // ---------- presentation ----------
@@ -130,15 +136,86 @@ router.get(
   }),
 );
 
+/** Where the caller may add a contribution for someone new: [{ groupId (null = the practice), name }]. */
+function newOwnerPlaces(user, practiceId, roles, tree) {
+  const practice = tree.practices.find((p) => p._id === practiceId);
+  const places = [{ groupId: null, name: practice?.name }, ...tree.groups.filter((g) => g.practiceId === practiceId).map((g) => ({ groupId: g._id, name: g.name }))];
+  return places.filter(({ groupId }) => canAddForNew(user, practiceId, groupId, tree) && !inv.inviteRefusal(user, { kind: "member", practiceId, groupId }, roles, tree));
+}
+
+/**
+ * Adding a contribution for an email address (rbac.md §4 "Practice contributions"). Decides, without side effects,
+ * what saving will do: `own` (a practice member in reach — same as picking them), `add` (an account outside the
+ * practice, which the caller could add directly), or `invite` (no account yet). Returns { error, status } otherwise.
+ */
+async function planNewOwner(req, practiceId, email, groupId) {
+  const { user, tree } = req;
+  if (!addForPractices(user, tree).includes(practiceId)) return { status: 403, error: `Missing permission ${PERM.MANAGE} in that practice` };
+  if (!inv.isEmail(email)) return { status: 400, error: "Enter a valid email address" };
+  if (!inv.domainAllowed(email)) return { status: 400, error: `Only ${process.env.INVITE_EMAIL_DOMAINS} addresses can be invited` };
+  if (groupId && !tree.groups.some((g) => g._id === groupId && g.practiceId === practiceId)) return { status: 400, error: "Unknown group" };
+  if (!canAddForNew(user, practiceId, groupId, tree)) return { status: 403, error: `Needs ${PERM.MANAGE} there — a Lead can only add contributions in their own group` };
+
+  const roles = await structureRoles();
+  const invite = { email, kind: "member", practiceId, groupId };
+  const account = await User.findOne({ email }, "displayName isActive").lean();
+  if (!account) {
+    const refusal = inv.inviteRefusal(user, invite, roles, tree);
+    return refusal ? { status: 403, error: refusal } : { action: "invite", email, groupId };
+  }
+  if (!account.isActive) return { status: 409, error: `${email} belongs to a deactivated account` };
+  const userId = String(account._id);
+  if (sameId(userId, user.id)) return { status: 400, error: "That's your own address — choose “Me” instead" };
+  const members = await practiceMembers(practiceId, tree.practices);
+  if (members.some((m) => m.id === userId)) {
+    // Already here: they stay in their own group, so the usual reach applies.
+    return canAddFor(user, practiceId, userId, tree) ? { action: "own", userId } : { status: 403, error: `${account.displayName} is in another group — a Lead can only add contributions for their own group` };
+  }
+  if (await isPracticeMember(userId, practiceId)) return { status: 400, error: `${account.displayName} can't contribute in this practice` };
+  if (inv.appointRefusal(user, invite, roles, tree)) return { status: 409, error: `${account.displayName} already has an account — ask the Practice Manager to add them to this practice` };
+  return { action: "add", userId, groupId };
+}
+
+/** Carries out planNewOwner's decision. Returns { ownerId, invite? }. */
+async function applyNewOwner(req, practiceId, plan) {
+  if (plan.action === "own") return { ownerId: plan.userId };
+  if (plan.action === "add") {
+    await addPracticeMember(practiceId, plan.userId, plan.groupId, req.user.id);
+    return { ownerId: plan.userId, added: true };
+  }
+  const { created, token, delivery } = await issueInvite(req, { email: plan.email, kind: "member", practiceId, groupId: plan.groupId, keepPrevious: true });
+  // Owner's decision 2026-11-18: the account exists from now on (no roles, like a first Google sign-in) so it can own
+  // the contribution; accepting the invitation makes them a practice member. Placing them in the group now routes the
+  // contribution to that group's Lead (memberScope) — the group's member list only shows practice members, so it
+  // doesn't list them before they accept. Accepting keeps this placement ($setOnInsert). Signing in with this email
+  // accepts the invitation too, so with Google sign-in on the account is Google-only: the demo's shared dev password
+  // must not open it (and its invitation) for someone else.
+  const { user: account } = await findOrCreateByEmail(plan.email, undefined, { googleOnly: isGoogleEnabled() });
+  if (plan.groupId) {
+    await GroupMembership.updateOne(
+      { practiceId, userId: account._id },
+      { $setOnInsert: { practiceId, groupId: plan.groupId, userId: account._id, addedBy: req.user.id, addedAt: new Date() } },
+      { upsert: true },
+    );
+  }
+  return { ownerId: String(account._id), invite: { id: String(created._id), email: plan.email, delivery: delivery.status, ...linkForInviter(token) } };
+}
+
 router.post(
   "/",
   wrap(async (req, res) => {
     const { user, tree } = req;
     const { practiceId, type } = req.body || {};
     const title = str(req.body?.title, 120, "Title");
+    // ownerEmail = adding it for someone by email, who may not be on Practise360 yet (invited on save).
+    const ownerEmail = req.body?.ownerEmail ? inv.normalizeEmail(req.body.ownerEmail) : "";
     // ownerId = adding it on a member's behalf (rbac.md §4 "Contributions"); otherwise the caller owns it.
-    const forId = req.body?.ownerId && !sameId(req.body.ownerId, user.id) ? String(req.body.ownerId) : null;
-    if (forId) {
+    const forId = !ownerEmail && req.body?.ownerId && !sameId(req.body.ownerId, user.id) ? String(req.body.ownerId) : null;
+    let newOwner = null;
+    if (ownerEmail) {
+      newOwner = await planNewOwner(req, practiceId, ownerEmail, req.body?.groupId || null);
+      if (newOwner.error) return bad(res, newOwner.error, newOwner.status);
+    } else if (forId) {
       if (!mongoose.isValidObjectId(forId)) return bad(res, "Pick a practice member");
       const members = await practiceMembers(practiceId, tree.practices);
       const member = members.find((m) => m.id === forId);
@@ -155,21 +232,28 @@ router.post(
     const dueDate = parseDate(req.body.dueDate);
     if (!startDate || !dueDate) return bad(res, "Start and due dates are required (YYYY-MM-DD)");
     if (dueDate < startDate) return bad(res, "Due date can't be before the start date");
+    const description = str(req.body.description, 200000, "Description");
 
+    // Side effects (invitation, account, membership) only once everything else is valid.
+    const placed = newOwner ? await applyNewOwner(req, practiceId, newOwner) : null;
+    const ownerId = placed?.ownerId ?? forId ?? user.id;
+    const onBehalf = !sameId(ownerId, user.id);
+    const body = placed?.invite ? `Added **${title}** on their behalf and invited them to the practice` : onBehalf ? `Added **${title}** on their behalf` : `Started **${title}**`;
     const c = await Contribution.create({
       practiceId,
       title,
       type,
       customType,
-      description: str(req.body.description, 200000, "Description"),
-      ownerId: forId ?? user.id,
+      description,
+      ownerId,
       createdBy: user.id,
       startDate,
       dueDate,
-      events: [forId ? { kind: "created", authorId: user.id, subjectId: forId, body: `Added **${title}** on their behalf` } : { kind: "created", authorId: user.id, body: `Started **${title}**` }],
+      events: [onBehalf ? { kind: "created", authorId: user.id, subjectId: ownerId, body } : { kind: "created", authorId: user.id, body }],
     });
-    req.contribution = c;
-    await respond(req, res, 201);
+    // A new member or group placement changes who reaches it, so actions are computed on the fresh tree.
+    if (placed?.invite || placed?.added) req.tree = await loadTree();
+    res.status(201).json({ ...(await detail(c, req.tree, user)), ...(placed?.invite && { invite: placed.invite }), ...(placed?.added && { addedToPractice: true }) });
   }),
 );
 
@@ -183,15 +267,21 @@ router.get(
   }),
 );
 
-/** Members the caller can add a contribution for — a Lead gets their group, a Manager the whole practice. */
+/**
+ * Who the caller can add a contribution for: `members` in reach (a Lead gets their group, a Manager the whole
+ * practice), and `inviteInto` — where someone new, added by email, can be placed (a Lead: their group).
+ */
 router.get(
   "/practices/:practiceId/owners",
   wrap(async (req, res) => {
     const { practiceId } = req.params;
     const { user, tree } = req;
     if (!addForPractices(user, tree).includes(practiceId)) return bad(res, `Missing permission ${PERM.MANAGE} in that practice`, 403);
-    const members = await practiceMembers(practiceId, tree.practices);
-    res.json(members.filter((m) => !sameId(m.id, user.id) && canAddFor(user, practiceId, m.id, tree)));
+    const [members, roles] = await Promise.all([practiceMembers(practiceId, tree.practices), structureRoles()]);
+    res.json({
+      members: members.filter((m) => !sameId(m.id, user.id) && canAddFor(user, practiceId, m.id, tree)),
+      inviteInto: newOwnerPlaces(user, practiceId, roles, tree),
+    });
   }),
 );
 

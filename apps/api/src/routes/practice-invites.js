@@ -3,19 +3,26 @@
 // appointment needs. Registered on the practices router (like the Overview) so `load` resolves :id first.
 const mongoose = require("mongoose");
 const { Invitation, INVITE_KINDS, User } = require("../models");
-const { can } = require("../rbac/engine");
+const { can, canWithin } = require("../rbac/engine");
 const { isDevAuth } = require("../middleware/auth");
 const { mailConfigured } = require("../lib/mailer");
 const { bad, wrap, usersById, person } = require("../lib/http");
 const { addPracticeMember, isPracticeMember, structureRoles } = require("../lib/practice-structure");
 const inv = require("../lib/invites");
 
-/** Who sees a practice's open invitations: people who could send one (they hold practices.roles.assign there). */
-const canSeeInvites = (user, practiceId, tree) => can(user, "practices.roles.assign", { type: "practice", id: practiceId }, undefined, tree);
+const canAssignHere = (user, practiceId, tree) => can(user, "practices.roles.assign", { type: "practice", id: practiceId }, undefined, tree);
+
+/**
+ * Who sees a practice's open invitations: people who could send one — practices.roles.assign there, or running one
+ * of its groups (a Lead, who sees only the invitations into their group).
+ */
+const canSeeInvites = (user, practiceId, tree) => canAssignHere(user, practiceId, tree) || canWithin(user, "practices.group.update", practiceId, tree);
 
 /** Open invitations of a practice, newest first, with what the caller may do to each. */
 async function listInvites(user, practiceId, tree) {
-  const [invites, roles] = await Promise.all([Invitation.find({ practiceId, status: "pending" }).sort({ createdAt: -1 }).lean(), structureRoles()]);
+  const [found, roles] = await Promise.all([Invitation.find({ practiceId, status: "pending" }).sort({ createdAt: -1 }).lean(), structureRoles()]);
+  // Without practices.roles.assign (a Lead) only the invitations the caller could have sent — into their own group.
+  const invites = canAssignHere(user, practiceId, tree) ? found : found.filter((i) => !inv.inviteRefusal(user, i, roles, tree));
   const people = await usersById(invites.map((i) => i.invitedBy));
   return invites.map((i) => {
     const allowed = !inv.inviteRefusal(user, i, roles, tree);
@@ -35,11 +42,15 @@ async function listInvites(user, practiceId, tree) {
   });
 }
 
-/** Why an email that already has an account can't be invited, phrased for the picker it was typed into. */
-async function alreadyOnPractise360(user, email, kind, practice) {
+/**
+ * Why an email that already has an account can't be invited, phrased for the picker it was typed into. `canAdd` =
+ * the caller could add them directly (a Lead who may only invite can't, so "pick them" would lead nowhere).
+ */
+async function alreadyOnPractise360(user, email, kind, practice, canAdd = true) {
   if (!user.isActive) return `${email} belongs to a deactivated account`;
   const member = await isPracticeMember(user._id, practice._id);
   if (kind === "member" && member) return `${user.displayName} (${email}) is already in ${practice.name}`;
+  if (kind === "member" && !canAdd) return `${user.displayName} already has an account (${email}) — ask the Practice Manager to add them to ${practice.name}`;
   // The Lead picker only lists practice members, so "pick them" wouldn't find someone from outside.
   if (kind === "lead" && !member) return `${user.displayName} (${email}) already has an account — add them to ${practice.name}, then choose them as Lead`;
   return `${user.displayName} already has an account (${email}) — pick them from the list instead`;
@@ -104,10 +115,11 @@ function inviteRoutes(router, { load, detail }) {
       if (groupId && !req.tree.groups.some((g) => g._id === groupId && g.practiceId === practiceId)) return bad(res, "Unknown group");
 
       const invite = { email, kind, practiceId, groupId, keepPrevious: b.keepPrevious !== false };
-      const refusal = inv.inviteRefusal(req.user, invite, await structureRoles(), req.tree);
+      const roles = await structureRoles();
+      const refusal = inv.inviteRefusal(req.user, invite, roles, req.tree);
       if (refusal) return bad(res, refusal, 403);
       const existing = await User.findOne({ email }, "displayName isActive").lean();
-      if (existing) return bad(res, await alreadyOnPractise360(existing, email, kind, req.practice), 409);
+      if (existing) return bad(res, await alreadyOnPractise360(existing, email, kind, req.practice, !inv.appointRefusal(req.user, invite, roles, req.tree)), 409);
 
       const { created, token, delivery } = await issueInvite(req, invite);
       await reply(req, res, 201, created, token, delivery);
@@ -190,4 +202,4 @@ function inviteRoutes(router, { load, detail }) {
   );
 }
 
-module.exports = { inviteRoutes, listInvites, canSeeInvites };
+module.exports = { inviteRoutes, listInvites, canSeeInvites, issueInvite, linkForInviter };

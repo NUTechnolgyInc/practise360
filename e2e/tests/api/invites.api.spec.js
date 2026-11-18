@@ -23,9 +23,12 @@ test.describe("Invitations — who may invite", () => {
     const manager = await as("de.manager");
     const lead = await as("de.lead");
     const dev = await as("de.dev1");
-    // A Manager can't appoint a Manager, so can't invite one either; Leads and practitioners can't bring anyone in.
+    // A Manager can't appoint a Manager, so can't invite one either. A Lead invites members into their own group only
+    // (owner's decision 2026-11-18); practitioners can't bring anyone in.
     expect((await manager.post(`/practices/${DE}/invites`, { email: newEmail("x"), kind: "manager" })).status()).toBe(403);
     expect((await lead.post(`/practices/${DE}/invites`, { email: newEmail("x") })).status()).toBe(403);
+    expect((await lead.post(`/practices/${DE}/invites`, { email: newEmail("x"), groupId: "digital-engineering-devops" })).status()).toBe(403);
+    expect((await lead.post(`/practices/${DE}/invites`, { email: newEmail("x"), groupId: "digital-engineering-fullstack" })).status()).toBe(201);
     expect((await dev.post(`/practices/${DE}/invites`, { email: newEmail("x") })).status()).toBe(403);
     // Another practice isn't visible to the DE Manager.
     expect((await manager.post("/practices/qa/invites", { email: newEmail("x") })).status()).toBe(404);

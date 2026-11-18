@@ -219,13 +219,13 @@ test.describe("Practice and group Contributions, group page", () => {
       const members = card(page, "Members");
       await members.getByRole("button", { name: "Add member" }).click();
       const dialog = page.getByRole("dialog", { name: "Add people to Fullstack" });
-      const jesse = dialog.getByRole("radio", { name: /Jesse Monroe· not in a group/ });
+      const jesse = dialog.getByRole("checkbox", { name: /Jesse Monroe· not in a group/ });
       await expect(jesse).toBeVisible();
-      await expect(dialog.getByRole("radio", { name: /Blair Kim/ })).toHaveCount(0); // in DevOps: another Lead's group
-      await expect(dialog.getByRole("radio", { name: /Morgan Reyes/ })).toHaveCount(0); // the Manager oversees every group
+      await expect(dialog.getByRole("checkbox", { name: /Blair Kim/ })).toHaveCount(0); // in DevOps: another Lead's group
+      await expect(dialog.getByRole("checkbox", { name: /Morgan Reyes/ })).toHaveCount(0); // the Manager oversees every group
       await jesse.check();
-      await dialog.getByRole("button", { name: "Add to group" }).click();
-      await expect(toast(page, "Added Jesse Monroe to Fullstack")).toBeVisible();
+      await dialog.getByRole("button", { name: "Add 1 person" }).click();
+      await expect(toast(page, "Added 1 to Fullstack")).toBeVisible();
       await expect(members.getByRole("row", { name: /Jesse Monroe/ })).toBeVisible();
 
       await members.getByRole("button", { name: "Remove Jesse Monroe from Fullstack" }).click();
