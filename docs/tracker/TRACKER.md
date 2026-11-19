@@ -39,7 +39,7 @@ Compress when the Change Log passes ~150–200 lines, or when a milestone closes
 |---|---|---|---|---|---|
 | P360-5 | MongoDB RBAC schema + seed | Done | 🟢 | 2026-11-11 | `npm run seed -w api`; rbac.md §2 updated to Mongo collections |
 | P360-6 | RBAC engine (`can`, escalation guard, visible apps) + API enforcement | Done | 🟡 | 2026-11-11 | 9 unit tests; Practices Admin perms widened — needs owner sign-off |
-| P360-7 | Access control portal (assign/revoke, custom roles, matrix) | Done | 🟢 | 2026-11-12 | Grant role is now scope → role; no user create/disable yet (`platform.users.manage`) |
+| P360-7 | Access control portal (assign/revoke, custom roles, matrix) | Done | 🟢 | 2026-11-19 | Grant role is scope → role; **Add by email** creates an account with a role before first sign-in; no user disable yet (`platform.users.manage`) |
 | P360-10 | Super Admin edits system roles (`platform.roles.manage`) | Done | 🟢 | 2026-11-12 | Super Admin role itself locked; sync-roles no longer overwrites edits (`--reset` to restore) |
 
 ## P360-E3 — Practices
@@ -64,6 +64,10 @@ Compress when the Change Log passes ~150–200 lines, or when a milestone closes
 ---
 
 ## Change Log
+
+### 2026-11-19 — Access control: add someone by email with a role (P360-7)
+Requested: Super Admin couldn't add a new user by email and give them a role so it's already there on first sign-in — invitations only covered practice Member/Manager/Lead, and *Grant a role* only worked on existing accounts. Built **Add by email** on Access control → Users (`POST /rbac/users`, `components/admin/add-by-email-modal.js`): it creates the account up front (Google-only when Google sign-in is on, like contribution owners) and grants the role through the same `grantRole` helper as `POST /rbac/assignments`, so the escalation guard and Manager/Lead slot rules are identical. Chose an immediate grant over a new deferred-invitation kind: it shows and revokes like any assignment and needs no accept step, since sign-in already resolves accounts by email. All checks run before the account is created. A new account gets a heads-up email (shared branded layout factored out of `invite-email.js`). rbac.md §4 "Adding someone by email" added; 5 unit tests in `test/add-by-email.test.js`; audit action `rbac.user.add`; OpenAPI documented.
+Known e2e failures, **also failing on `main` before this change** (logged here, not fixed): CON-API-43 (test creates a contribution for another group's member as de.dev1 → 403 since the Lead-reach rule), AUTH-UI-09 ("Continue with Google" stub text — Google sign-in is real now), CERT-UI-04 ("Submitted for approval" toast not found), INV-UI-01 (invitee doesn't land on the practice page after signing in). CERT-UI-02 is flaky (passed on re-run). The specs need updating to current behaviour.
 
 ### 2026-11-18 — Caching for faster screens (no ticket)
 Screens felt slow because nothing was cached: every visit refetched everything, and every API request re-read the RBAC tree (4 queries) before doing any work. Added: a shared stale-while-revalidate cache behind `useResource`/`useRbacData` (cleared on sign-in/out/expiry); the last `/me` per tab in `sessionStorage`; an in-memory RBAC tree cache on the API keyed by a DB change stamp (`cache_versions`) bumped by model hooks on every tree write, so archives and group moves still apply at once across Vercel instances (grants stay uncached); `private, no-cache` + `Vary: Authorization` on GETs so unchanged responses come back as 304s; indexes on contributions (practice/owner by `updatedAt`, `contributorIds`) and cert plans. rbac.md §2 lists the new collection. The e2e cleanup helper (raw driver) now bumps the stamp too. E2E: 360 pass; CON-API-43, AUTH-UI-09 and INV-UI-01 fail with or without this change (checked on the pre-change code) — not yet investigated.

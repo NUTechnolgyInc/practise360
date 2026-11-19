@@ -16,6 +16,7 @@ const ACTIONS = [
   ["DELETE", "/rbac/roles/:id", "rbac.role.delete", "Deleted a role", "Access control"],
   ["POST", "/rbac/assignments", "rbac.assignment.grant", "Granted a role", "Access control"],
   ["DELETE", "/rbac/assignments/:id", "rbac.assignment.revoke", "Revoked a role", "Access control"],
+  ["POST", "/rbac/users", "rbac.user.add", "Added someone by email with a role", "Access control"],
 
   ["PUT", "/ai/usage-reports/mine/:period", "ai.usage.upload", "Uploaded a Claude usage report", "AI Tracker"],
   ["DELETE", "/ai/usage-reports/mine/:period", "ai.usage.delete", "Deleted a Claude usage report", "AI Tracker"],

@@ -13,18 +13,9 @@ const GROUPS = [
   { type: "group", label: "Practice groups" },
 ];
 
-/**
- * Scope first, then the roles grantable there — roles are tied to a scope level, so picking a role first
- * made people guess which role fits where. Both lists come from /rbac/assignable (escalation guard).
- */
-export function GrantRoleForm({ userId, assignable, onGranted }) {
-  const toast = useToast();
-  const [scopeKey, setScopeKey] = useState("");
-  const [roleId, setRoleId] = useState("");
-  const [busy, setBusy] = useState(false);
-
-  // Invert role → scopes into scope → roles.
-  const scopes = useMemo(() => {
+/** Inverts /rbac/assignable (role → scopes) into scope → roles, the order the pickers ask in. */
+export function useScopeOptions(assignable) {
+  return useMemo(() => {
     const byKey = new Map();
     for (const o of assignable) {
       for (const s of o.scopes) {
@@ -35,14 +26,62 @@ export function GrantRoleForm({ userId, assignable, onGranted }) {
     }
     return [...byKey.values()];
   }, [assignable]);
+}
+
+/**
+ * Scope + role selects with their state. A single option is picked for you. Returns { scope, role, reset, fields }:
+ * render `fields` inside the form; `scope`/`role` are the current choice (or undefined).
+ */
+export function useScopeRolePicker(assignable, idPrefix = "grant") {
+  const scopes = useScopeOptions(assignable);
+  const [scopeKey, setScopeKey] = useState("");
+  const [roleId, setRoleId] = useState("");
+  const scope = scopes.length === 1 ? scopes[0] : scopes.find((s) => s.key === scopeKey);
+  const roles = scope?.roles ?? [];
+  const role = roles.length === 1 ? roles[0] : roles.find((r) => r.roleId === roleId);
+  const reset = () => {
+    setRoleId("");
+    setScopeKey("");
+  };
+
+  const fields = (
+    <>
+      <Field id={`${idPrefix}-scope`} label="Scope" hint="Where the role applies">
+        <Select id={`${idPrefix}-scope`} required value={scope ? scope.key : scopeKey} onChange={(e) => { setScopeKey(e.target.value); setRoleId(""); }}>
+          <option value="">Select a scope</option>
+          {GROUPS.map((g) => {
+            const items = scopes.filter((s) => s.type === g.type);
+            return items.length ? (
+              <optgroup key={g.type} label={g.label}>
+                {items.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
+              </optgroup>
+            ) : null;
+          })}
+        </Select>
+      </Field>
+      <Field id={`${idPrefix}-role`} label="Role" hint="Only roles you're allowed to grant here">
+        <Select id={`${idPrefix}-role`} required disabled={!scope} value={role ? role.roleId : roleId} onChange={(e) => setRoleId(e.target.value)}>
+          <option value="">{scope ? "Select a role" : "Pick a scope first"}</option>
+          {roles.map((r) => <option key={r.roleId} value={r.roleId}>{r.roleName}</option>)}
+        </Select>
+      </Field>
+    </>
+  );
+  return { scope, role, reset, fields };
+}
+
+/**
+ * Scope first, then the roles grantable there — roles are tied to a scope level, so picking a role first
+ * made people guess which role fits where. Both lists come from /rbac/assignable (escalation guard).
+ */
+export function GrantRoleForm({ userId, assignable, onGranted }) {
+  const toast = useToast();
+  const [busy, setBusy] = useState(false);
+  const { scope, role, reset, fields } = useScopeRolePicker(assignable);
 
   if (assignable.length === 0) {
     return <p className="mt-5 text-[11px] text-gray-400">You can't grant roles — that needs practices.roles.assign or platform.apps.assign.</p>;
   }
-
-  const scope = scopes.length === 1 ? scopes[0] : scopes.find((s) => s.key === scopeKey);
-  const roles = scope?.roles ?? [];
-  const role = roles.length === 1 ? roles[0] : roles.find((r) => r.roleId === roleId);
 
   async function onSubmit(e) {
     e.preventDefault();
@@ -51,8 +90,7 @@ export function GrantRoleForm({ userId, assignable, onGranted }) {
     try {
       await api("/rbac/assignments", { method: "POST", body: { userId, roleId: role.roleId, scopeType: scope.type, scopeId: scope.id } });
       toast(`Granted ${role.roleName} @ ${scope.label}`);
-      setRoleId("");
-      setScopeKey("");
+      reset();
       await onGranted();
     } catch (err) {
       toast(err.message, "error");
@@ -64,27 +102,7 @@ export function GrantRoleForm({ userId, assignable, onGranted }) {
   return (
     <form onSubmit={onSubmit} className="mt-6 rounded-2xl border border-dashed border-gray-200 p-4">
       <h3 className="mb-3 text-xs font-bold uppercase tracking-wider text-nu-navy">Grant a role</h3>
-      <div className="grid gap-3 sm:grid-cols-2">
-        <Field id="grant-scope" label="Scope" hint="Where the role applies">
-          <Select id="grant-scope" required value={scope ? scope.key : scopeKey} onChange={(e) => { setScopeKey(e.target.value); setRoleId(""); }}>
-            <option value="">Select a scope</option>
-            {GROUPS.map((g) => {
-              const items = scopes.filter((s) => s.type === g.type);
-              return items.length ? (
-                <optgroup key={g.type} label={g.label}>
-                  {items.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
-                </optgroup>
-              ) : null;
-            })}
-          </Select>
-        </Field>
-        <Field id="grant-role" label="Role" hint="Only roles you're allowed to grant here">
-          <Select id="grant-role" required disabled={!scope} value={role ? role.roleId : roleId} onChange={(e) => setRoleId(e.target.value)}>
-            <option value="">{scope ? "Select a role" : "Pick a scope first"}</option>
-            {roles.map((r) => <option key={r.roleId} value={r.roleId}>{r.roleName}</option>)}
-          </Select>
-        </Field>
-      </div>
+      <div className="grid gap-3 sm:grid-cols-2">{fields}</div>
       <div className="mt-4 flex justify-end">
         <Button type="submit" variant="dark" disabled={busy || !scope || !role}>
           <Plus aria-hidden="true" /> {busy ? "Granting…" : "Grant role"}
