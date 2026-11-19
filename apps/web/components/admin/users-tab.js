@@ -1,14 +1,16 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Search } from "lucide-react";
+import { Search, UserPlus } from "lucide-react";
 import { Badge, Button, Card, CardHeader, EmptyState, Input, Table, TBody, TD, TH, THead, TR } from "@/components/ui";
 import { PersonChip } from "@/components/people/person-link";
 import { UserAccessModal } from "./user-access-modal";
+import { AddByEmailModal } from "./add-by-email-modal";
 
 export function UsersTab({ users, assignable, onChanged }) {
   const [query, setQuery] = useState("");
   const [selectedId, setSelectedId] = useState(null);
+  const [adding, setAdding] = useState(false);
   const canAssign = assignable.length > 0;
 
   const filtered = useMemo(() => {
@@ -23,10 +25,17 @@ export function UsersTab({ users, assignable, onChanged }) {
         title="Users & assignments"
         description="Showing role assignments in the scopes you can see."
         actions={
-          <div className="relative w-full sm:w-64">
-            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-gray-400" aria-hidden="true" />
-            <Input aria-label="Search users" placeholder="Search by name or email" value={query} onChange={(e) => setQuery(e.target.value)} className="pl-9" />
-          </div>
+          <>
+            <div className="relative w-full sm:w-64">
+              <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-gray-400" aria-hidden="true" />
+              <Input aria-label="Search users" placeholder="Search by name or email" value={query} onChange={(e) => setQuery(e.target.value)} className="pl-9" />
+            </div>
+            {canAssign && (
+              <Button onClick={() => setAdding(true)}>
+                <UserPlus aria-hidden="true" /> Add by email
+              </Button>
+            )}
+          </>
         }
       />
       {filtered.length === 0 ? (
@@ -69,6 +78,7 @@ export function UsersTab({ users, assignable, onChanged }) {
           </TBody>
         </Table>
       )}
+      {adding && <AddByEmailModal assignable={assignable} onClose={() => setAdding(false)} onAdded={onChanged} />}
       {selected && <UserAccessModal user={selected} assignable={assignable} onClose={() => setSelectedId(null)} onChanged={onChanged} />}
     </Card>
   );

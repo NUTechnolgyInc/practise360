@@ -5,7 +5,10 @@ const { can, checkGrant, allScopes } = require("../rbac/engine");
 const { describeScope } = require("../rbac/present");
 const { requireAnyScope } = require("../middleware/auth");
 const structure = require("../lib/practice-structure");
-const { cancelPending } = require("../lib/invites");
+const { cancelPending, normalizeEmail } = require("../lib/invites");
+const { addByEmailRefusal, notifyAccess } = require("../lib/add-by-email");
+const { findOrCreateByEmail } = require("../lib/accounts");
+const { isGoogleEnabled } = require("../lib/google-auth");
 const { noteDetails } = require("../lib/audit");
 
 const router = express.Router();
@@ -72,6 +75,30 @@ router.get(
   }),
 );
 
+/**
+ * Grants `role` at `scope` to `target` after the escalation guard and the Manager/Lead slot rules (rbac.md §5).
+ * Shared by "Grant a role" and "Add by email" so both enforce exactly the same thing.
+ * Returns { id } or { status, error }.
+ */
+async function grantRole(req, target, role, scope) {
+  const verdict = checkGrant(req.user, role, scope, req.tree);
+  if (!verdict.ok) return { status: 403, error: verdict.reason };
+  // One Manager per practice, one Lead per group, Leads come from the practice (rbac.md §5).
+  const clash = await structure.grantConflict(role, scope, target._id, req.tree);
+  if (clash) return clash;
+  try {
+    const a = await RoleAssignment.create({ userId: target._id, roleId: role._id, scopeType: scope.type, scopeId: scope.id, grantedBy: req.user.id });
+    await structure.afterGrant(role, scope, target._id, req.user.id, req.tree);
+    // Filling a Manager or Lead slot here voids an open invitation for it, which would otherwise replace them on accept.
+    if (role._id === "practice_manager") await cancelPending({ practiceId: scope.id, kind: "manager" }, req.user.id, "Another Manager was chosen");
+    if (role._id === "practice_lead") await cancelPending({ kind: "lead", groupId: scope.id }, req.user.id, "Another Lead was chosen");
+    return { id: String(a._id) };
+  } catch (err) {
+    if (err.code === 11000) return { status: 409, error: `${target.displayName} already has ${role.name} there` };
+    throw err;
+  }
+}
+
 router.post(
   "/assignments",
   wrap(async (req, res) => {
@@ -82,23 +109,42 @@ router.post(
     if (!role) return res.status(404).json({ error: "Role not found" });
 
     const scope = { type: scopeType, id: scopeType === "platform" ? null : scopeId };
-    const verdict = checkGrant(req.user, role, scope, req.tree);
-    if (!verdict.ok) return res.status(403).json({ error: verdict.reason });
-    // One Manager per practice, one Lead per group, Leads come from the practice (rbac.md §5).
-    const clash = await structure.grantConflict(role, scope, userId, req.tree);
-    if (clash) return res.status(clash.status).json({ error: clash.error });
+    const result = await grantRole(req, target, role, scope);
+    if (result.error) return res.status(result.status).json({ error: result.error });
+    res.status(201).json({ id: result.id });
+  }),
+);
 
-    try {
-      const a = await RoleAssignment.create({ userId, roleId, scopeType, scopeId: scope.id, grantedBy: req.user.id });
-      await structure.afterGrant(role, scope, userId, req.user.id, req.tree);
-      // Filling a Manager or Lead slot here voids an open invitation for it, which would otherwise replace them on accept.
-      if (role._id === "practice_manager") await cancelPending({ practiceId: scope.id, kind: "manager" }, req.user.id, "Another Manager was chosen");
-      if (role._id === "practice_lead") await cancelPending({ kind: "lead", groupId: scope.id }, req.user.id, "Another Lead was chosen");
-      res.status(201).json({ id: String(a._id) });
-    } catch (err) {
-      if (err.code === 11000) return res.status(409).json({ error: `${target.displayName} already has ${role.name} there` });
-      throw err;
+/**
+ * Add someone by email with a role (rbac.md §4 "Adding someone by email"). Every check runs before the account
+ * exists, so a refused request never leaves an empty account behind. An email that already has an account just gets
+ * the role, as if they'd been picked from the list.
+ */
+router.post(
+  "/users",
+  wrap(async (req, res) => {
+    const b = req.body || {};
+    const email = normalizeEmail(b.email);
+    const scope = { type: b.scopeType, id: b.scopeType === "platform" ? null : b.scopeId ?? null };
+    const role = typeof b.roleId === "string" ? await Role.findById(b.roleId).lean() : null;
+    const refusal = addByEmailRefusal({ actor: req.user, email, role, scope, tree: req.tree });
+    if (refusal) return res.status(refusal.status).json({ error: refusal.error });
+
+    const existing = await User.findOne({ email }).lean();
+    if (existing && !existing.isActive) return res.status(409).json({ error: `${email} belongs to a deactivated account` });
+    if (!existing) {
+      // A brand-new account has no assignments, so the slot and practice-membership checks can run against it now.
+      const clash = await structure.grantConflict(role, scope, null, req.tree);
+      if (clash) return res.status(clash.status).json({ error: clash.error });
     }
+
+    const displayName = typeof b.displayName === "string" ? b.displayName.trim().slice(0, 80) : "";
+    // Google-only when Google sign-in is on, so the shared demo password can't claim the address (as for contribution owners).
+    const { user, created } = existing ? { user: existing, created: false } : await findOrCreateByEmail(email, displayName, { googleOnly: isGoogleEnabled() });
+    const result = await grantRole(req, user, role, scope);
+    if (result.error) return res.status(result.status).json({ error: result.error });
+    const delivery = created ? await notifyAccess({ email, inviterName: req.user.displayName, role, scope, tree: req.tree }) : null;
+    res.status(201).json({ userId: String(user._id), assignmentId: result.id, created, displayName: user.displayName, delivery });
   }),
 );
 

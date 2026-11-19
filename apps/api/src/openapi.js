@@ -244,6 +244,27 @@ function buildSpec({ serverUrl } = {}) {
             scopeId: { type: "string", nullable: true, description: "Ignored for platform scope", example: "qa" },
           },
         },
+        UserAddByEmail: {
+          type: "object",
+          required: ["email", "roleId", "scopeType"],
+          properties: {
+            email: { type: "string", format: "email", example: "new.person@example.com" },
+            displayName: { type: "string", description: "Optional; defaults to a name made from the email", example: "New Person" },
+            roleId: { type: "string", example: "cert_admin" },
+            scopeType: ref("ScopeType"),
+            scopeId: { type: "string", nullable: true, description: "Ignored for platform scope", example: "cert-tracker" },
+          },
+        },
+        UserAdded: {
+          type: "object",
+          properties: {
+            userId: { type: "string" },
+            assignmentId: { type: "string" },
+            created: { type: "boolean", description: "false = the email already had an account, which just got the role" },
+            displayName: { type: "string" },
+            delivery: { type: "string", nullable: true, enum: ["sent", "logged", "failed", null], description: "The access email, for a new account only" },
+          },
+        },
       },
     },
     paths: {
@@ -400,6 +421,22 @@ function buildSpec({ serverUrl } = {}) {
             "Requires one of `practices.members.view`, `practices.roles.assign`, `platform.users.manage`, `platform.apps.assign`. All active users are listed; assignments are filtered to scopes the caller can see.",
           security: [{ bearerAuth: [] }],
           responses: { 200: json("Users", { type: "array", items: ref("DirectoryUser") }), ...UNAUTH, ...FORBIDDEN },
+        },
+        post: {
+          tags: ["Users"],
+          summary: "Add someone by email with a role",
+          description:
+            "Creates the account up front (Google-only when Google sign-in is enabled) and grants the role, so their first sign-in already has it. Same escalation guard and Manager/Lead slot rules as granting; every check runs before the account is created. An email that already has an account just gets the role. A new account gets a heads-up email.",
+          security: [{ bearerAuth: [] }],
+          requestBody: body(ref("UserAddByEmail")),
+          responses: {
+            201: json("Added", ref("UserAdded")),
+            400: err("Invalid email, domain not allowed, unknown scope, or a Lead who isn't in the practice"),
+            ...UNAUTH,
+            403: err("Escalation guard refused (reason in `error`)"),
+            404: err("Role not found"),
+            409: err("Deactivated account, slot already filled, or they already hold this role there"),
+          },
         },
       },
       "/rbac/assignable": {

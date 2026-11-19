@@ -173,6 +173,7 @@ module.exports = {
   domainAllowed,
   hashToken,
   newToken,
+  webUrl,
   acceptUrl,
   usernameBase,
   displayNameFromEmail,
